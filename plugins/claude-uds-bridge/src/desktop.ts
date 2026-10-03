@@ -4,6 +4,7 @@
 import net from 'node:net';
 import { once } from 'node:events';
 import { randomUUID } from 'node:crypto';
+import { realpathSync } from 'node:fs';
 import { z } from 'zod';
 import { checkSocket, uuid } from './claude';
 import { desktopInputs } from './desktop-input';
@@ -134,6 +135,16 @@ class DesktopConnection {
 
   async inputs() { return desktopInputs(await this.snapshot()); }
 
+  async project() { return (await this.snapshot()).cwd; }
+
+  async info() {
+    const state = await this.snapshot();
+    return { project: state.cwd, streamVersion: 11 as const, supportsUntrustedAppInput: true as const,
+      runtime: { status: state.threadRuntimeStatus.type === 'idle' ? 'idle' as const
+        : state.threadRuntimeStatus.type === 'active' ? 'busy' as const : 'unknown' as const,
+        mode: permissionMode(state.currentPermissions) } };
+  }
+
   private async refresh() {
     this.dirty = true;
     if (this.refreshing) return;
@@ -260,9 +271,15 @@ class DesktopConnection {
   }
 }
 
-export async function watchDesktop(path: string, threadId: string, onState: (state: Runtime) => void, onDisconnect: () => void) {
+export async function watchDesktop(path: string, threadId: string, onState: (state: Runtime) => void, onDisconnect: () => void, expectedProject?: string) {
   const connection = new DesktopConnection(path, threadId, onDisconnect);
-  try { await connection.connect(); await connection.observe(onState); return () => connection.close(); }
+  try {
+    await connection.connect();
+    if (expectedProject && realpathSync((await connection.info()).project) !== realpathSync(expectedProject)) {
+      throw new Error('Codex project mismatch; receiver was not registered');
+    }
+    await connection.observe(onState); return () => connection.close();
+  }
   catch (error) { connection.close(); throw error; }
 }
 
@@ -283,5 +300,18 @@ export async function readDesktopRuntime(path: string, threadId: string) {
 export async function readDesktopInputs(path: string, threadId: string) {
   const connection = new DesktopConnection(path, threadId);
   try { await connection.connect(); return await connection.inputs(); }
+  finally { connection.close(); }
+}
+
+export async function readDesktopProject(path: string, threadId: string) {
+  const connection = new DesktopConnection(path, threadId);
+  try { await connection.connect(); return await connection.project(); }
+  finally { connection.close(); }
+}
+
+export async function readDesktopInfo(path: string, threadId: string) {
+  uuid.parse(threadId);
+  const connection = new DesktopConnection(path, threadId);
+  try { await connection.connect(); return await connection.info(); }
   finally { connection.close(); }
 }

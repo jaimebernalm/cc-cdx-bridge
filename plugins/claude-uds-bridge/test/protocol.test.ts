@@ -77,6 +77,30 @@ async function until(condition: () => boolean, timeoutMs = 2000) {
   expect(condition()).toBe(true);
 }
 
+test('a remote-held outbound message cannot become a Codex approval or be injected into its inbox', async () => {
+  const f = await fixture();
+  try {
+    const sent = await f.bridge.sendMessage(f.peerId, 'outbound message held by the other agent');
+    await f.transmit({type:'control',action:'peer_message_status',orig_msg_id:sent.messageId,status:'held'});
+    await until(() => f.bridge.status().messages.some(message => message.id === sent.messageId && message.status === 'held'));
+    expect(f.bridge.held()).toEqual([]);
+    expect(f.bridge.reviewableHeld()).toEqual([]);
+    expect(f.bridge.status().heldCount).toBe(0);
+    await f.bridge.resolveHeld(sent.messageId!, 'approve');
+    await f.bridge.resolveHeld(sent.messageId!, 'deny');
+    await f.bridge.setExpiry('60s');
+    expect(f.db.query<{expires_at:number|null},[string]>('SELECT expires_at FROM messages WHERE id=?').get(sent.messageId!)?.expires_at).toBeNull();
+    await f.bridge.setPolicy('accept');
+    await f.bridge.setPolicy('refuse');
+    expect(f.desktop.submissions).toEqual([]);
+    expect(f.bridge.status().messages.find(message => message.id === sent.messageId)?.status).toBe('held');
+    expect(f.frames.filter(frame=>frame.type==='control' && frame.action==='peer_message_status')).toEqual([]);
+    // Only the remote peer's receipt may settle the outbound hold.
+    await f.transmit({type:'control',action:'peer_message_status',orig_msg_id:sent.messageId,status:'expired'});
+    await until(() => f.bridge.status().messages.some(message => message.id === sent.messageId && message.status === 'expired'));
+  } finally { await f.close(); }
+});
+
 test('MCP sends and receives a peer reply with a large task history', async () => {
   const f = await fixture();
   const client = new Client({ name: 'large-history-test', version: '1.0.0' });
