@@ -1,13 +1,17 @@
 {
   "name": "claude-uds-bridge",
-  "version": "0.1.0",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
   "scripts": {
     "start": "bun src/server.ts",
-    "build": "bun build src/server.ts src/hook.ts --target=bun --minify --outdir=dist",
+    "build": "bun build src/server.ts src/hook.ts src/cli.ts --target=bun --minify --outdir=dist",
     "check": "tsc --noEmit",
-    "test": "bun test"
+    "test": "bun test",
+    "smoke:desktop": "bun scripts/desktop-smoke.ts",
+    "doctor": "bun src/cli.ts doctor",
+    "attach": "bun src/cli.ts attach",
+    "verify:installation": "bun scripts/verify-installation.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",

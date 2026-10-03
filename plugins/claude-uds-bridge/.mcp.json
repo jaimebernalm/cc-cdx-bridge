@@ -1,10 +1,10 @@
 {
   "mcpServers": {
     "claude_uds_bridge": {
-      "command": "bun",
-      "args": ["./dist/server.js"],
+      "command": "/bin/sh",
+      "args": ["./scripts/run-bun.sh", "./dist/server.js"],
       "cwd": ".",
-      "required": true,
+      "required": false,
       "env_vars": ["CODEX_HOME", "CLAUDE_CONFIG_DIR", "PATH", "HOME"]
     }
   }

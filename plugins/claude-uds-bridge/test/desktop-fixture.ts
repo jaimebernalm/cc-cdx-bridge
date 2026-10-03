@@ -7,7 +7,7 @@ import { z } from "zod";
 
 const requestSchema = z.object({ type: z.string(), requestId: z.string().optional(), method: z.string(), params: z.unknown() });
 
-export async function receiver(state: 'active' | 'idle', dropAcknowledgement = false, endBeforeSteer = false, root = mkdtempSync('/tmp/desktop-test-')) {
+export async function receiver(state: 'active' | 'idle', dropAcknowledgement = false, endBeforeSteer = false, root = mkdtempSync('/tmp/desktop-test-'), options: { streamVersion?: number } = {}) {
   mkdirSync(join(root, 'ipc'), { mode: 0o700 });
   const path = join(root, 'ipc', 'ipc.sock');
   const threadId = randomUUID();
@@ -46,7 +46,7 @@ export async function receiver(state: 'active' | 'idle', dropAcknowledgement = f
         else if (request.method === 'thread-owner-discovery') reply({ supportsUntrustedAppInput: true });
         else if (request.method === 'thread-stream-following-changed') {
           if (!z.object({ following: z.boolean() }).parse(request.params).following) continue;
-          write({ type: 'broadcast', sourceClientId: 'owner', method: 'thread-stream-state-changed', version: 11,
+          write({ type: 'broadcast', sourceClientId: 'owner', method: 'thread-stream-state-changed', version: options.streamVersion ?? 11,
             params: { conversationId: threadId, change: { type: 'snapshot',
               conversationState: { cwd: root, threadRuntimeStatus: { type: state }, currentPermissions: permissions, ...history } } } });
         } else {

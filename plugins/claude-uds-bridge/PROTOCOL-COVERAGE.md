@@ -40,7 +40,7 @@ The bridge covers local messaging, including confirmed input correlation, hop-ch
 | More than 100 held messages | Discard the oldest and acknowledge with `queue-full`. Separate from the guard for delivered text. |
 | Regular session end | Held messages are acknowledged as expired. A hard process kill cannot guarantee the acknowledgement. |
 | Automatic hold dialog | A hidden `SessionStart` MCP hook binds the native task ID and starts the receiver. Later held UDS input triggers a single release with no model call, even without an active turn. |
-| Startup readiness | `required: true` makes Codex wait for MCP before `SessionStart`. Divergence: if MCP cannot initialize, the task fails to start. |
+| Startup readiness | Fork MCP is optional (`required: false`). SessionStart requires tools to be loaded and hooks trusted; a missing runtime does not establish readiness. Native ordering and every fallback scenario are not guaranteed. |
 | Dialog lifetime | The MCP SDK deadline is a separate 60 seconds. A technical timeout leaves the message held, and `inbox` allows another attempt. On message expiry or a settings change, the open request is cancelled. Late approvals have no effect. |
 | Background attach and window close | Open. The message deadline does not pause for a missing visible window. In the native cancellation test, no `serverRequest/resolved` notice arrived before the late answer, so early UI closing is unproven. |
 | Global, managed, and project settings | Open. Claude's settings precedence is not reproduced, and its configuration is never changed. |
@@ -49,6 +49,8 @@ The bridge covers local messaging, including confirmed input correlation, hop-ch
 The permitted deadline values come from the [settings reference](https://code.claude.com/docs/en/settings-reference#dialogexpiry). The bridge adopts the values for held messages, not Claude's whole dialog management.
 
 ## Sizes, repeats, and loops
+
+The fork's phase-1 `collaboration_*` API adds a private, versioned run log and exact participant bindings above this transport. Its `CC_CDX_RUN_V1` header is our correlation format, not a native Claude protocol guarantee. Receivers advertise `managed_runs_v1`; older receivers cannot start a managed run. Time/message budgets and cancellation gate managed writes and queued incoming deliveries. Idle notices are logged without model delivery for managed participants. A socket write, receipt or explicit closure is not proof of model consumption or agreement. Unmanaged conversations retain the original transport behavior. Presets, independent-analysis barriers and autonomous scheduling are not implemented.
 
 | Case | Bridge |
 | --- | --- |
@@ -102,6 +104,12 @@ The permitted deadline values come from the [settings reference](https://code.cl
 | Provider and Claude version | Discovery follows a running peer with protocol 1 and the capabilities it advertises. Claude's provider and feature settings are never touched. |
 | Organization-wide tool blocks | Codex manages MCP access. Claude deny rules are not imported. |
 | Concurrent file changes | No file locks. Agreed ownership or separate worktrees stay necessary. |
+
+## Guided work extension (fork 0.4.0)
+
+`CC_CDX_RUN_V1` remains the transport correlation envelope. Optional `CC_CDX_WORK_V1` adds task/report metadata in the body; it is an application-level convention, not a new Claude peer protocol or unknown advertised capability. Receiver capability `guided_runs_v1` is stored in private Codex receiver state with PID/start identity. Authorship is derived from verified transport/caller identity. Only permitted delivered responses can materialize peer results/reviews. Held, denied and late content is redacted from managed status/export. Existing unstructured correlated responses remain supported.
+
+Guidance defaults to free collaboration; research/review and existing/mixed starts are optional. Exact-version review and a declared closure do not certify intellectual consensus. Independence barriers and autonomous phase transitions remain outside this version.
 
 ## Scope of testing
 

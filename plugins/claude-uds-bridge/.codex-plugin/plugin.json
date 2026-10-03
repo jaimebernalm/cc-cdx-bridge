@@ -1,23 +1,24 @@
 {
   "name": "claude-uds-bridge",
-  "version": "0.1.0",
-  "description": "Discover and message live Claude Code and Codex sessions through local UDS inboxes.",
+  "version": "0.4.0",
+  "description": "Guide Codex Desktop and Claude Desktop Code collaboration with free, research and review routines, authored results and versioned assessments.",
   "author": {
-    "name": "Leon Kohli"
+    "name": "Jaime Bernal (fork of Leon Kohli)"
   },
   "license": "MIT",
-  "homepage": "https://github.com/LeonKohli/claude-uds-bridge",
+  "homepage": "https://github.com/jaimebernalm/cc-cdx-bridge",
   "interface": {
-    "displayName": "Claude UDS Bridge",
-    "shortDescription": "Exchange messages with local Claude Code sessions.",
-    "longDescription": "Session lifecycle hooks make this task discoverable through Claude ListAgents. Peer messages steer its active turn or start a new turn when idle. MCP provides listing, sending and status.",
-    "developerName": "Leon Kohli",
+    "displayName": "CC–CDX Bridge",
+    "shortDescription": "Collaborate, research and review with both agents.",
+    "longDescription": "Choose exact Desktop conversations, continue existing analyses or start new work, collaborate freely or use research/review guidance, record authored results and assessments of exact versions, preserve disagreements and export the exchange. Reception settings still apply. A shared UI and an independent-analysis barrier are planned.",
+    "developerName": "Jaime Bernal · based on Leon Kohli's bridge",
     "category": "Productivity",
     "capabilities": [
       "Read",
       "Write"
     ],
-    "defaultPrompt": "Show my local agent sessions and this task's receive status."
+    "defaultPrompt": "Use bridge-collaboration to contrast approaches with the Claude Desktop conversation in this project."
   },
-  "mcpServers": "./.mcp.json"
+  "mcpServers": "./.mcp.json",
+  "skills": "./skills/"
 }
