@@ -18,7 +18,9 @@ The bridge covers local messaging, including confirmed input correlation, hop-ch
 | Active turn | Native steering request. No interrupt. |
 | Idle task | Native start request with inherited settings. |
 | Turn ends during steering | A new start follows only after an explicit rejection naming the ended turn. |
-| Text, paths, `@`, and slash commands | Plain text input with no automatic attachments and no command execution. |
+| Text, paths, `@`, and slash commands | Plain text input with no automatic attachments and no command execution. Nonempty `file_attachments` are refused with a reason; they are never silently stripped. |
+| Native priorities | `now`, `next`, and `later` are accepted through the same non-interrupting Desktop delivery path. |
+| Sender session attribution | Outgoing envelopes carry `from-session` with the native Codex thread ID. |
 | Origin and permissions | Peer marking, sender ID, and reply address. Peer text grants no approvals. Configuration changes and bypassing local restrictions are explicitly forbidden. |
 | Input identifier | A random desktop identifier per delivery. A sender-chosen `msg_id` cannot claim an existing user input as peer input. |
 | Sender history and files | No automatic transfer. |
@@ -56,7 +58,8 @@ The fork's phase-1 `collaboration_*` API adds a private, versioned run log and e
 | --- | --- |
 | Message size | At most 1,048,576 serialized characters per frame, checked before sending. UTF-8 survives chunk boundaries. |
 | Sender burst | Budget of 30, refilling 0.5 per second per target. A local refusal writes neither text nor an attached idle subscription. |
-| Held acknowledgement | Releases the sender budget. A later delivery charges it again. |
+| Held acknowledgement | Releases the sender budget. A later delivery charges it again. `delivered` is sent only when a held input is released; ordinary acceptance sends no receipt. |
+| Receipt reasons and targets | Native `reason` is retained as `status_reason` and in managed receipt evidence. Text and control frames addressed to another Codex task are ignored. |
 | Repeats at the receiver | The same last text from the same sender within 30 seconds is dropped. Message IDs are also deduplicated permanently. |
 | Rate at the receiver | Same budget values. The check runs at delivery, including after a hold release. |
 | Hop chains | Incoming chains are checked: discard at ten own tokens or more than 28 entries. Outgoing frames append the own token, up to 32 entries. |
@@ -87,7 +90,9 @@ The fork's phase-1 `collaboration_*` API adds a private, versioned run log and e
 
 | Case | Bridge |
 | --- | --- |
-| Local transport | UDS, private directories, one operating-system user. No transport service leaves the machine. |
+| Local transport | UDS, private directories, one operating-system user. No transport service leaves the machine. Native alternate socket names are accepted with the existing owner, directory, registry filename and process checks. |
+| Encoded addresses | Spaces, literal percent signs and Unicode are percent-encoded on the wire and decoded for socket access. Existing raw SQLite references migrate atomically once without changing reception or queued contents. |
+| Claude `/clear` | Ordinary receipts and idle notices follow the same address/start identity; replies use the current session ID. Managed runs keep their original exact ID, block on a verified session change and reject both correlated and raw new-session input. Raw sends and re-reservation of that process remain blocked until explicit closure. Held managed input is revalidated before release. |
 | Unsafe or overlong socket directory | Check the private fallback `/tmp/cc-socks-<uid>`. On failure, no receiver starts. |
 | Invalid target path, symlink, wrong owner | Refuse. A start-time check guards against a reused PID. |
 | Connection without a complete first line | Close after 30 seconds. |
@@ -114,3 +119,10 @@ Guidance defaults to free collaboration; research/review and existing/mixed star
 ## Scope of testing
 
 `bun run check`, `bun test`, and `bun run build` check the local code. The tests use real UDS connections, SQLite, and separate MCP and hook processes. The desktop counterpart is a fixture. These do not replace native UI tests or end-to-end tests against Claude. Cases marked open are not a parity promise.
+
+
+## Upstream protocol backport (fork 0.4.1)
+
+Protocol fixes are derived from upstream commit [`7b535a1`](https://github.com/LeonKohli/claude-uds-bridge/commit/7b535a1ce209d3b80ca1c46c35d91f212078474c), with shared version ownership derived from [`378c6f3`](https://github.com/LeonKohli/claude-uds-bridge/commit/378c6f3d5d41e93f1150e229734f549273c3d04d). The app-server transport and its daemon-specific native test remain outside this backport; Codex continues to use the validated Desktop IPC contract.
+
+`test/protocol.test.ts` covers the wire changes, encoded MCP-to-receiver sending and ordinary `/clear` continuity. `test/trust.test.ts` covers alternate socket names and unchanged ownership/process checks. `test/bridge.test.ts` covers legacy address migration, preservation of held state and restart idempotency. `test/phase1.test.ts` covers `/clear` during a managed run, retained receipts, blocked raw sends at both APIs and the receiver socket, explicit re-selection after closure, and held replies that must never reach the model after an identity change. Manifest/MCP/doctor versions are checked against `package.json`; cached distributions advertise 0.4.1.

@@ -110,4 +110,11 @@ Límites: no se ha ejecutado CI Linux en esta rama; la prueba real no simula ca�
 - Prueba real final: dos respuestas/análisis atribuidos, una sola intención de inyección, evento de apertura anterior a esa intención, nonce Claude observado en el chat, pausa/resume y cierre completed, cero reservas de la ejecución.
 - `git diff --check`: correcto. Pruebas locales macOS; no se declara CI remota ejecutada.
 
-Para recuperar el trabajo tras compacción: no repetir pruebas reales cerradas. La implementación reside en src/coordination.ts, src/runs.ts, src/routine-ledger.ts y la integración de src/bridge.ts, collaboration.ts y server.ts; pruebas en phase3.test.ts y phase3-native.test.ts. La próxima acción de producto es recargar Codex para ver collaboration_control y después decidir revisión/PR o fase 4, según instrucción nueva del usuario.
+Para recuperar el trabajo tras compacción: no repetir pruebas reales cerradas. La implementación reside en src/coordination.ts, src/runs.ts, src/routine-ledger.ts y la integración de src/bridge.ts, collaboration.ts y server.ts; pruebas en phase3.test.ts y phase3-native.test.ts. El catálogo de la app ya anuncia la skill 0.5.0. La próxima acción es revisar la PR de esta fase y decidir su fusión o la fase 4, según instrucción nueva del usuario.
+
+
+### Preparación de PR e integración con main
+
+El usuario autorizó publicar la PR y resolver conflictos. Se integró `origin/main` en `a4627ee` (PR #2, compatibilidad de protocolo) mediante un merge en la rama feature. Se resolvieron diez archivos con conflictos: README, manifests/versiones, comprobación de instalación, doctor, núcleo de ejecuciones, MCP y tres bundles. Se conserva la versión 0.5.0 con la versión centralizada de main; permanecen las correcciones para direcciones UDS codificadas, prioridades, recibos y el bloqueo de conversaciones gestionadas tras /clear. Los bundles se regeneraron desde las fuentes combinadas.
+
+Verificación local después de integrar: TypeScript y lockfile congelado correctos; **109 pruebas y 805 comprobaciones** en fuente y otras **109/805** con MCP/hook compilados, sin fallos. Esta verificación incluye los casos de compatibilidad añadidos en PR #2 y los casos de coordinación de fase 3. La prueba Desktop real documentada arriba se ejecutó antes de esta integración; la combinación final se verificó con MCP, UDS, SQLite y fixture IPC, sin afirmar una nueva prueba real en las apps. La PR de fase 3 no se fusiona automáticamente.

@@ -13,8 +13,9 @@ import { Collaboration } from '../src/collaboration';
 import { inspectProject, compareProjects } from '../src/project';
 import { discoverParticipants, inspectParticipant, type Participant } from '../src/participants';
 import { formatManaged, parseManaged } from '../src/managed-message';
-import { frameSchema, peers, processStart, type Peer } from '../src/claude';
+import { frameSchema, peers, findPeer, socketPath, processStart, type Peer } from '../src/claude';
 import { receiver } from './desktop-fixture';
+import { sendViaReceiver } from '../src/outbound';
 
 const pluginRoot=resolve(import.meta.dir,'..');
 const context=contextSchema.parse({objective:'Contrast two approaches',constraints:['No file edits'],priorAnalysis:{codex:'Earlier analysis A',claude:'Earlier analysis B'}});
@@ -272,4 +273,63 @@ test('unsupported future collaboration schemas fail without rewriting their vers
   const root=mkdtempSync('/tmp/phase1-schema-');const path=join(root,'collaborations.sqlite');
   try {const db=new Database(path);db.exec('PRAGMA user_version=4');db.close();chmodSync(path,0o600);expect(()=>new RunStore(root)).toThrow('future');const verify=new Database(path,{readonly:true});expect(verify.query<{user_version:number},[]>('PRAGMA user_version').get()?.user_version).toBe(4);verify.close();}
   finally {rmSync(root,{recursive:true,force:true});}
+});
+
+
+test('managed /clear keeps verified receipts but blocks new-session input, raw sends and reassignment until closure', async () => {
+  const f = await liveFixture();
+  try {
+    const run = await f.make(); await f.collaboration.start(run.id);
+    const messageId = randomUUID(); await f.collaboration.send(run.id, messageId, 'Pinned conversation question');
+    const sent = f.frames.find(frame => frame.type === 'user')!;
+    if (sent.type !== 'user') throw new Error('Missing outbound frame');
+    const cleared = randomUUID(); f.write({ sessionId: cleared });
+    await f.transmit({ type: 'control', session_id: randomUUID(), action: 'peer_message_status', orig_msg_id: sent.msg_id, status: 'delivered' });
+    await f.bridge.setPolicy('default');
+    expect(f.bridge.runs.status(run.id, f.desktop.threadId).state).toBe('active');
+    await f.transmit({ type: 'control', session_id: f.desktop.threadId, action: 'peer_message_status', orig_msg_id: sent.msg_id, status: 'delivered', reason: 'Released before clear' });
+    await until(() => f.bridge.runs.status(run.id, f.desktop.threadId).messages[0]?.status === 'delivered');
+    const state = f.bridge.runs.status(run.id, f.desktop.threadId);
+    expect(state.state).toBe('blocked'); expect(state.reason).toBe('participant_session_changed');
+    expect(state.participants.find(p => p.provider === 'claude')?.sessionId).toBe(f.peerId);
+    expect(f.bridge.status().messages.find(m => m.id === sent.msg_id)?.status_reason).toBe('Released before clear');
+    const late = await f.reply(run.id, messageId, 'reply from the cleared session');
+    const rawId = randomUUID();
+    await f.transmit({ type: 'user', msg_id: rawId, message: { role: 'user', content: 'raw input from the cleared session' } });
+    await until(() => f.bridge.status().messages.find(m => m.id === rawId)?.status === 'dropped');
+    expect(f.bridge.status().messages.find(m => m.id === late.transportId)?.drop_reason).toBe('participant-session-changed');
+    expect(f.desktop.submissions).toHaveLength(0);
+    await expect(f.bridge.sendMessage(cleared, 'raw bypass')).rejects.toThrow('managed collaboration');
+    const peer = findPeer(f.configDir, cleared);
+    const written = await sendViaReceiver(socketPath(f.bridge.status().replyAddress!).replace(/\.sock$/, '.out'), peer,
+      [{ msgV: 1, type: 'user', msg_id: randomUUID(), from: f.bridge.status().replyAddress!, session_id: cleared,
+        message: { role: 'user', content: 'receiver socket bypass' } }]);
+    expect(written).toBe(false);
+    expect(f.frames.filter(frame => frame.type === 'user')).toHaveLength(1);
+    expect(f.bridge.runs.status(run.id, f.desktop.threadId).messagesUsed).toBe(1);
+    const selected = await f.collaboration.prepare({ requestId: randomUUID(), peerId: cleared, context, limits, revisionPolicy: 'same' });
+    await expect(f.collaboration.start(selected.id)).rejects.toThrow('already belongs');
+    f.bridge.runs.stop(run.id, f.desktop.threadId, 'cancelled', 'Close the cleared conversation');
+    expect((await f.collaboration.start(selected.id)).state).toBe('active');
+  } finally { await f.close(); }
+});
+
+test('a managed reply held before /clear is never released into a changed conversation', async () => {
+  const f = await liveFixture();
+  try {
+    const run = await f.make(); await f.collaboration.start(run.id);
+    const messageId = randomUUID(); await f.collaboration.send(run.id, messageId, 'question before clear');
+    await f.bridge.setPolicy('hold');
+    const held = await f.reply(run.id, messageId, 'held response before clear');
+    await until(() => f.bridge.status().heldCount === 1);
+    f.write({ sessionId: randomUUID() });
+    await f.bridge.setPolicy('accept');
+    expect(f.desktop.submissions).toHaveLength(0);
+    expect(f.bridge.status().messages.find(m => m.id === held.transportId)).toMatchObject({ status: 'dropped', drop_reason: 'participant-or-project-changed' });
+    const state = f.bridge.runs.status(run.id, f.desktop.threadId);
+    expect(state.state).toBe('blocked');
+    expect(state.messages.find(m => m.id === held.messageId)?.text).toBeNull();
+    expect(state.results).toHaveLength(0);
+    expect(state.participants.find(p => p.provider === 'claude')?.sessionId).toBe(f.peerId);
+  } finally { await f.close(); }
 });

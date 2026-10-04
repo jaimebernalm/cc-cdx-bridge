@@ -24,7 +24,7 @@ function readLine(socket: net.Socket): Promise<unknown> {
   });
 }
 
-export async function outboundServer(path: string, configDir: string, address: string, canWrite: (frames: Frame[]) => boolean, onRequest: () => void) {
+export async function outboundServer(path: string, configDir: string, address: string, canWrite: (frames: Frame[], peer: Peer) => boolean, onRequest: () => void) {
   const connections = new Set<net.Socket>();
   const server = net.createServer(socket => {
     connections.add(socket);
@@ -42,7 +42,7 @@ export async function outboundServer(path: string, configDir: string, address: s
         const peer = findPeer(configDir, request.sessionId);
         if (peer.messagingSocketPath !== request.socketPath || (peer.procStart ?? null) !== request.procStart) throw new Error('Target process changed');
         onRequest();
-        const written = await sendFrames(configDir, peer, request.frames, { canWrite: () => canWrite(request.frames) });
+        const written = await sendFrames(configDir, peer, request.frames, { canWrite: () => canWrite(request.frames, peer) });
         socket.end(JSON.stringify({ written }) + '\n');
       } catch (error) {
         if (!socket.destroyed) socket.end(JSON.stringify(error instanceof SendRefused
