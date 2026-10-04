@@ -9,7 +9,8 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { z } from 'zod';
 import { Bridge } from '../src/bridge';
-import { peers } from '../src/claude';
+import { peers, peerAddress } from '../src/claude';
+import { version } from '../src/version';
 import { Database } from 'bun:sqlite';
 
 test('MCP binds state to caller metadata and rejects a different task', async () => {
@@ -17,8 +18,9 @@ test('MCP binds state to caller metadata and rejects a different task', async ()
   const client = new Client({ name: 'test', version: '1.0.0' });
   try {
     await client.connect(new StdioClientTransport({ command: process.execPath,
-      args: [join(import.meta.dir, '../src/server.ts')],
+      args: [process.env.UDS_MCP_TEST_ENTRYPOINT ?? join(import.meta.dir, '../src/server.ts')],
       env: { CODEX_HOME: root, CLAUDE_CONFIG_DIR: root } }));
+    expect(client.getServerVersion()?.version).toBe(version);
     const missing = await client.callTool({ name: 'status', arguments: {} });
     expect(missing.isError).toBe(true);
     const id = randomUUID();
@@ -50,6 +52,36 @@ test('upgrading the inbox preserves existing queue records without relabelling t
     await bridge.close();
     rmSync(root, { recursive: true });
   }
+});
+
+test('legacy raw addresses migrate once without losing held messages or idle subscriptions', async () => {
+  const root = mkdtempSync('/tmp/uds-address-upgrade-');
+  const threadId = randomUUID();
+  const messageId = randomUUID();
+  const subscriptionId = randomUUID();
+  const peerId = randomUUID();
+  const path = join(root, `${threadId}.sqlite`);
+  const raw = '/tmp/peer 100%é-%20.sock';
+  const old = new Database(path);
+  old.exec(`CREATE TABLE messages (id TEXT PRIMARY KEY, peer_id TEXT, direction TEXT, text TEXT, status TEXT, peer_address TEXT, peer_start TEXT, created_at INTEGER);
+    CREATE TABLE idle_requests (id TEXT PRIMARY KEY, peer_id TEXT NOT NULL, peer_address TEXT NOT NULL, peer_start TEXT, direction TEXT NOT NULL, status TEXT NOT NULL, expires_at INTEGER NOT NULL, UNIQUE(direction,peer_address));`);
+  old.run('INSERT INTO messages VALUES (?,?,?,?,?,?,?,?)', [messageId, peerId, 'in', 'held before upgrade', 'held', `uds:${raw}`, 'start', 1]);
+  old.run('INSERT INTO idle_requests VALUES (?,?,?,?,?,?,?)', [subscriptionId, peerId, `uds:${raw}`, 'start', 'out', 'waiting', Date.now() + 60000]);
+  old.close();
+  try {
+    for (let reopen = 0; reopen < 2; reopen++) {
+      const bridge = new Bridge(threadId, root, root, join(root, 'unavailable.sock'));
+      try {
+        expect(bridge.status().messages[0]).toMatchObject({ id: messageId, status: 'held', status_reason: null });
+        expect(bridge.held()[0]?.text).toBe('held before upgrade');
+        const db = new Database(path, { readonly: true });
+        try {
+          expect(db.query<{peer_address:string},[string]>('SELECT peer_address FROM messages WHERE id=?').get(messageId)?.peer_address).toBe(peerAddress(raw));
+          expect(db.query<{peer_address:string;status:string},[string]>('SELECT peer_address,status FROM idle_requests WHERE id=?').get(subscriptionId)).toEqual({peer_address:peerAddress(raw),status:'waiting'});
+        } finally { db.close(); }
+      } finally { await bridge.close(); }
+    }
+  } finally { rmSync(root, { recursive: true }); }
 });
 
 test('registered peers can initiate contact; unknown senders and wrong targets are rejected and duplicates survive restart', async () => {

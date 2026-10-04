@@ -2,6 +2,7 @@ import { existsSync, realpathSync } from 'node:fs';
 import { join } from 'node:path';
 import { Database } from 'bun:sqlite';
 import { ownedJson, peers, processStart, uuid } from './claude';
+import { version } from './version';
 import { readDesktopInfo } from './desktop';
 import { observeClaudeSettings, evaluateInbound, type InboundPolicy } from './permissions';
 
@@ -26,7 +27,7 @@ export async function doctor(options: DoctorOptions) {
   if (!['darwin', 'linux'].includes(process.platform)) add('platform', 'blocked', 'This fork requires POSIX Unix sockets.', 'Use macOS or Linux; Windows transport is not implemented.');
   try {
     const manifest = ownedJson(join(options.pluginRoot, '.codex-plugin', 'plugin.json'), 65536) as { name: string; version: string };
-    if (manifest.name !== 'claude-uds-bridge' || manifest.version !== '0.4.0') throw new Error('Manifest mismatch');
+    if (manifest.name !== 'claude-uds-bridge' || manifest.version !== version) throw new Error('Manifest mismatch');
     for (const file of ['dist/server.js', 'dist/hook.js', 'dist/cli.js', 'scripts/run-bun.sh', 'skills/bridge-collaboration/SKILL.md', 'skills/bridge-collaboration/references/api.md']) {
       if (!existsSync(join(options.pluginRoot, file))) throw new Error(`Missing ${file}`);
     }
