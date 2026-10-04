@@ -24,12 +24,12 @@ try {
   if (marketplace.marketplaceName !== 'jaimebernalm') throw new Error('Unexpected marketplace identity');
   checks.push({ check: 'marketplace', passed: true });
   const installed = await cli(['plugin', 'add', 'claude-uds-bridge@jaimebernalm', '--json']);
-  if (installed.version !== '0.4.0' || installed.pluginId !== 'claude-uds-bridge@jaimebernalm') throw new Error('Unexpected installed plugin');
+  if (installed.version !== '0.5.0' || installed.pluginId !== 'claude-uds-bridge@jaimebernalm') throw new Error('Unexpected installed plugin');
   const listing = await cli(['plugin', 'list', '--marketplace', 'jaimebernalm', '--json']);
   if (!listing.installed?.some((item: { pluginId: string; enabled: boolean }) => item.pluginId === installed.pluginId && item.enabled)) throw new Error('Installed plugin not enabled');
   checks.push({ check: 'installation', passed: true, version: installed.version });
   const digest = (path: string) => createHash('sha256').update(readFileSync(path)).digest('hex');
-  for (const file of ['dist/server.js', 'dist/hook.js', 'dist/cli.js', 'scripts/run-bun.sh', '.mcp.json', 'hooks/hooks.json', '.codex-plugin/plugin.json', 'skills/bridge-collaboration/SKILL.md', 'skills/bridge-collaboration/references/api.md']) {
+  for (const file of ['dist/server.js', 'dist/hook.js', 'dist/cli.js', 'scripts/run-bun.sh', '.mcp.json', 'hooks/hooks.json', '.codex-plugin/plugin.json', 'skills/bridge-collaboration/SKILL.md', 'skills/bridge-collaboration/references/api.md', 'skills/bridge-collaboration/references/structured.md']) {
     if (digest(join(installed.installedPath, file)) !== digest(join(repository, 'plugins', 'claude-uds-bridge', file))) throw new Error(`Cached file differs: ${file}`);
   }
   checks.push({ check: 'installed_files_match_checkout', passed: true });

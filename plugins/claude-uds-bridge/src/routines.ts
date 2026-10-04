@@ -55,5 +55,5 @@ export function guide(routine: Routine) {
   return { ...routine, guidance: routineGuides[routine.mode], initial: {
     codex: routine.starts.codex === 'existing' ? 'Continúa el análisis Codex explícito; evita repetirlo sin motivo.' : 'Elabora el análisis Codex necesario para este objetivo.',
     claude: routine.starts.claude === 'existing' ? 'Continúa el análisis Claude explícito; evita repetirlo sin motivo.' : 'Elabora el análisis Claude necesario para este objetivo.',
-  }, limits: 'Los límites de tiempo y mensajes los aplica el núcleo. Las declaraciones de los agentes no son estados validados ni consenso. No hay barrera de independencia técnica.' };
+  }, limits: 'Los límites de tiempo y mensajes los aplica el núcleo. Las declaraciones de los agentes no son estados validados ni consenso. La independencia intelectual no se garantiza. La coordinación estructurada opcional puede retener el intercambio de análisis iniciales de esta ejecución.' };
 }

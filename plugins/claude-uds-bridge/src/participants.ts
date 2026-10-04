@@ -40,13 +40,14 @@ export async function discoverParticipants(configDir: string, stateDir?: string)
         version: typeof version === 'string' ? version : null,
         managedReceiver:peer.entrypoint==='codex-claude-uds-bridge'?managedReceiver(stateDir,peer):null,
         guidedReceiver:peer.entrypoint==='codex-claude-uds-bridge'?managedReceiver(stateDir,peer,'guided_runs_v1'):null,
+        structuredReceiver:peer.entrypoint==='codex-claude-uds-bridge'?managedReceiver(stateDir,peer,'structured_runs_v1'):null,
         eligibleSurface: peer.entrypoint === 'codex-claude-uds-bridge' || peer.entrypoint === 'claude-desktop' && claudeVersionSupported(version) });
     } catch { /* Stale or ambiguous metadata is not selectable. */ }
   }
   return result.sort((a, b) => (b.startedAt ?? 0) - (a.startedAt ?? 0));
 }
 
-export async function inspectParticipant(options: ParticipantOptions, id: string, provider: 'codex' | 'claude', guided=false): Promise<Participant> {
+export async function inspectParticipant(options: ParticipantOptions, id: string, provider: 'codex' | 'claude', guided=false, structured=false): Promise<Participant> {
   const peer = await verifiedPeer(options.configDir, id);
   let version: string | null = null;
   if (provider === 'claude') {
@@ -58,6 +59,7 @@ export async function inspectParticipant(options: ParticipantOptions, id: string
     if (peer.entrypoint !== 'codex-claude-uds-bridge') throw new Error('Selected Codex conversation has no bridge receiver');
     if (!managedReceiver(options.stateDir,peer)) throw new Error('Codex receiver predates managed collaborations; reload the plugin receiver before preparing a run');
     if(guided && !managedReceiver(options.stateDir,peer,'guided_runs_v1'))throw new Error('Codex receiver predates guided routines; reload the phase-2 receiver');
+    if(structured && !managedReceiver(options.stateDir,peer,'structured_runs_v1'))throw new Error('Codex receiver predates structured coordination; reload the phase-3 receiver');
     const native = await readDesktopInfo(options.ipcPath, id);
     if (realpathSync(native.project) !== realpathSync(peer.cwd)) throw new Error('Native Codex project disagrees with receiver registry');
     const db = new Database(join(options.stateDir, `${id}.sqlite`), { readonly: true });

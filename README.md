@@ -1,6 +1,6 @@
 # CC–CDX Bridge
 
-Fork maintained at [jaimebernalm/cc-cdx-bridge](https://github.com/jaimebernalm/cc-cdx-bridge), based on [Leon Kohli's Claude UDS Bridge](https://github.com/LeonKohli/claude-uds-bridge). Version 0.4.0 adds guided free/research/review collaboration from chat, new/existing/mixed analysis starts, authored result versions and exact-version reviews. It preserves private logs, budgets and reception settings. An independent-analysis barrier, autonomous supervisor and shared UI remain planned. See [phase 0](docs/FASE_0.md), [phase 1](docs/FASE_1.md), [phase 2](docs/FASE_2.md) and the [compatibility and reception decision](docs/COMPATIBILIDAD.md).
+Fork maintained at [jaimebernalm/cc-cdx-bridge](https://github.com/jaimebernalm/cc-cdx-bridge), based on [Leon Kohli's Claude UDS Bridge](https://github.com/LeonKohli/claude-uds-bridge). Version 0.5.0 adds optional structured coordination: versioned context/tasks, an initial exchange barrier, pause/resume, controller leases, crash recovery and exact-version review coverage. It preserves private logs, budgets and reception settings. The barrier withholds current-run analyses; it does not erase chat history. A shared UI remains planned. See [phase 3](docs/FASE_3.md), [phase 2](docs/FASE_2.md) and the [compatibility and reception decision](docs/COMPATIBILIDAD.md).
 
 A Codex plugin that lets Codex tasks and Claude Code sessions message each other on one machine.
 
