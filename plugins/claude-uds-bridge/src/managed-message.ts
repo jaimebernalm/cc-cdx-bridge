@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { uuid } from './claude';
 
-export const managedHeader = z.object({ runId: uuid, messageId: uuid, contextVersion: z.literal(1), replyTo: uuid.optional() }).strict();
+export const managedHeader = z.object({ runId: uuid, messageId: uuid, contextVersion: z.number().int().min(1).max(1000000), replyTo: uuid.optional() }).strict();
 export type ManagedHeader = z.infer<typeof managedHeader>;
 export const managedPrefix = 'CC_CDX_RUN_V1 ';
 

@@ -2,7 +2,7 @@
 
 ## Decisión
 
-La distribución actual 0.4.0 se ofrece como **piloto supervisado**. La base de recepción se validó en 0.2.0; la fase 1 añade parejas y registro gestionado; la fase 2 añade skill, orientaciones adaptables y resultados/revisiones atribuidos. Se prefieren sesiones cuya recepción actual permita el intercambio. No hay una capacidad soportada y verificada para cambiar la recepción únicamente en una conversación Claude Desktop ya abierta. No se introduce un editor automático de configuración global temporal.
+La distribución actual 0.5.0 se ofrece como **piloto supervisado**. La base de recepción se validó en 0.2.0; la fase 1 añade parejas y registro gestionado; la fase 2 añade skill, orientaciones adaptables y resultados/revisiones atribuidos; la fase 3 añade coordinación estructurada opcional, barrera de intercambio inicial y recuperación explícita. Se prefieren sesiones cuya recepción actual permita el intercambio. No hay una capacidad soportada y verificada para cambiar la recepción únicamente en una conversación Claude Desktop ya abierta. No se introduce un editor automático de configuración global temporal.
 
 En Claude, `/config` escribe la opción de recepción en los ajustes de usuario; `--settings` puede fijarla por proceso al iniciarlo. Ninguna de esas capacidades demuestra un ajuste individual disponible para una conversación Desktop existente. El ajuste de usuario `accept` alcanza otras sesiones Claude. Una restricción de proyecto/local puede endurecerlo; un `accept` de proyecto no permite aflojarlo. Las fuentes managed y del proceso pueden cambiar el resultado efectivo. El registro de sesiones no publica ese resultado.
 
@@ -91,3 +91,10 @@ Con un cliente MCP 0.4.0 asociado al mismo chat se completaron tres colaboracion
 Un intento inicial quedó retenido al aparecer el ajuste de usuario Claude sin configurar. Se canceló y, con autorización humana explícita nueva, se restableció únicamente `crossSessionInbound: "accept"`, preservando los demás ajustes. La respuesta tardía de esa ejecución cancelada se descartó. No se modificaron permisos de ejecución/edición ni se crearon chats.
 
 La recarga posterior confirmó `collaboration_guide`, `collaboration_report`, las ocho herramientas gestionadas anteriores y la skill. Una prueba breve realizada directamente con el catálogo de este chat registró un borrador, envió un encargo de revisión y recibió la respuesta nativa Claude de la versión/hash exactos, con nonce y cálculo comprobados por este modelo. Terminó con dos mensajes y liberó las reservas. No se cambiaron ajustes ni permisos. La recarga pendiente de fase 2 queda resuelta. Detalles, evidencia privada, límites y recuperación en [FASE_2.md](FASE_2.md).
+
+
+## Comprobación de fase 3
+
+La distribución 0.5.0 mantiene el piloto supervisado y requiere `structured_runs_v1` para preparar con `coordination`. Hay contexto versionado, tareas con autor esperado, controles con revisión CAS, lease por proceso, pausa y recuperación. Los informes detrás de barrera quedan en una tabla privada separada hasta abrirse; los procesos antiguos todavía abiertos no pueden escribir ejecuciones estructuradas. Una respuesta correlacionada y un consumo observado se conservan como evidencias separadas del ACK.
+
+Se completó una prueba real de barrera y pausa en las mismas conversaciones Desktop: respuesta Claude anticipada retenida, análisis Codex registrado, respuesta nativa liberada y ejecución cerrada. No se cambiaron ajustes ni se crearon chats. La UI y la generación de encargos intelectuales en segundo plano quedan fuera de esta fase. El catálogo nativo antiguo requiere recarga; la validación MCP nueva se realizó asociada a este chat. Detalles y límites en [FASE_3.md](FASE_3.md).

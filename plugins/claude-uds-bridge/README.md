@@ -2,7 +2,7 @@
 
 This folder holds the plugin itself. For what it does, how to install it, and how to work on it, read the [repository README](../../README.md).
 
-Fork version 0.4.0 provides guided collaboration from chat: `free` by default, optional `research`/`review`, and per-agent new/existing analysis starts. The bundled `bridge-collaboration` skill combines the managed tools, authored results and reviews of immutable versions while preserving disagreements. Conversations remain in the Desktop apps. Reception settings still apply; no independent-analysis barrier, autonomous supervisor or shared UI is included. Reload the plugin tools and receiver for `guided_runs_v1` support.
+Fork version 0.5.0 adds optional structured coordination (`coordination` at prepare): context versions, assigned tasks, an initial analysis exchange barrier, pause/resume, controller leases and explicit recovery. The bundled skill keeps free collaboration and optional research/review guidance. The barrier withholds this run’s analyses until both are recorded; existing chat memory remains. Reception settings still apply. Reload tools and receiver for `structured_runs_v1`. No shared UI or background intellectual-task generation is included. See [phase 3](../../docs/FASE_3.md).
 
 Implementation and continuity records: [FASE_1.md](../../docs/FASE_1.md) and [FASE_2.md](../../docs/FASE_2.md). The SQLite migration from schema 1 to 2 preserves old runs; their absent routine/report metadata remains absent rather than inferred.
 
