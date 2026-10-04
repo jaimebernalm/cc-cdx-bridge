@@ -163,6 +163,7 @@ export class Bridge {
         this.db.run("INSERT INTO receiver_capabilities VALUES ('managed_runs_v1',?,?)",[process.pid,procStart]);
         this.db.run("INSERT INTO receiver_capabilities VALUES ('guided_runs_v1',?,?)",[process.pid,procStart]);
         this.db.run("INSERT INTO receiver_capabilities VALUES ('structured_runs_v1',?,?)",[process.pid,procStart]);
+        this.db.run("INSERT INTO receiver_capabilities VALUES ('panel_commands_v1',?,?)",[process.pid,procStart]);
       })();
       this.ownsReceiver = true;
       this.db.run("UPDATE messages SET status='unknown' WHERE status='submitting'");

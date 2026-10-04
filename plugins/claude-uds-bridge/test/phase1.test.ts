@@ -253,7 +253,7 @@ test('MCP phase-1 API uses caller identity, reconstructs logs across processes a
   const call=(name:string,args:Record<string,unknown>,owner=f.desktop.threadId)=>client.callTool({name,arguments:args,_meta:{threadId:owner}});
   const data=(result:Awaited<ReturnType<typeof call>>)=>JSON.parse((result.content as {type:string;text:string}[])[0]!.text);
   try {
-    await connect();const tools=await client.listTools();expect(tools.tools.filter(t=>t.name.startsWith('collaboration_'))).toHaveLength(11);
+    await connect();const tools=await client.listTools();expect(tools.tools.filter(t=>t.name.startsWith('collaboration_'))).toHaveLength(13);
     const prepared=data(await call('collaboration_prepare',{requestId:randomUUID(),peerId:f.peerId,context,limits}));
     expect(f.frames).toHaveLength(0);expect((await call('collaboration_start',{runId:prepared.id,supervised:true})).isError).not.toBe(true);
     const messageId=randomUUID();expect((await call('collaboration_send',{runId:prepared.id,messageId,text:'MCP controlled message'})).isError).not.toBe(true);

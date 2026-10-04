@@ -15,12 +15,16 @@ import { contextSchema, limitsSchema } from './runs';
 import { discoverParticipants } from './participants';
 import { coordinationSchema, controlSchema } from './coordination';
 import { routineSchema, normalizeRoutine, guide, taskSchema, reportSchema, closureSchema } from './routines';
+import { startPanel } from './panel';
+import { PanelCommands } from './panel-commands';
+import { inspectParticipant } from './participants';
 
 const configDir = process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), '.claude');
 const codexHome = process.env.CODEX_HOME ?? join(homedir(), '.codex');
 const stateDir = join(codexHome, 'plugin-state', 'claude-uds-bridge');
 let bridge: Bridge | undefined;
 let dialogs: HeldDialogs | undefined;
+let panel:ReturnType<typeof startPanel>|undefined;
 
 export function callerThread(meta: Record<string, unknown> | undefined): string {
   let turn: unknown = meta?.['x-codex-turn-metadata'];
@@ -94,6 +98,16 @@ function collaboration(meta: Record<string,unknown> | undefined) {
   const bound=current(meta);
   return new Collaboration(bound.runs,bound.threadId,{configDir,stateDir,ipcPath:join(codexHome,'ipc','ipc.sock')},bound);
 }
+server.registerTool('collaboration_panel',{description:'Open an authenticated loopback panel bound to this actual caller chat. Reads the shared collaboration ledger and lets the human queue start/control actions. Returns a private URL; do not share it. Does not itself start work, change permissions or install a persistent service.',inputSchema:{},annotations:{openWorldHint:false}},async(_args,extra)=>{
+  const owner=callerThread(extra._meta);current(extra._meta);
+  panel??=startPanel({configDir,stateDir,ipcPath:join(codexHome,'ipc','ipc.sock'),codexHome,pluginRoot:dirname(import.meta.dir),ownerThread:owner});
+  return result({url:panel.url,scope:'caller_chat',version});
+});
+server.registerTool('collaboration_panel_command',{description:'Read and apply one persisted human action submitted in the authenticated local panel. Verifies the real caller metadata and native project; arguments contain only the command UUID. No peer notification can invent approval. Repeating applied UUID returns its recorded result. Failed/unfinished applications are not replayed. After create, coordinate the recorded objective using the existing collaboration tools.',inputSchema:{commandId:uuid},annotations:{openWorldHint:false}},async({commandId},extra)=>{
+  const c=collaboration(extra._meta),options={configDir,stateDir,ipcPath:join(codexHome,'ipc','ipc.sock')};
+  const participant=await inspectParticipant(options,c.owner,'codex',true,true);
+  const queue=new PanelCommands(stateDir);try{return result(await queue.apply(commandId,c,participant.project.directory));}finally{queue.close();}
+});
 server.registerTool('collaboration_discover', { description:'List process-verified local conversations with exact IDs, surface and engine. Names may repeat; only Desktop participants qualify. Does not send messages, import history or create collaboration state.',
   inputSchema:{},annotations:{readOnlyHint:true,openWorldHint:false} },async (_args,extra)=>{
     callerThread(extra._meta); return result(await discoverParticipants(configDir,stateDir));
@@ -162,6 +176,6 @@ server.registerTool('inbox', { description: 'Open a dialog the user answers. Use
   return result({ ...await dialogs?.review(), ...bridge.status() });
 });
 
-server.server.onclose = () => { void (async () => { await dialogs?.close(); await bridge?.close(); })()
+server.server.onclose = () => { void (async () => { await panel?.close(); await dialogs?.close(); await bridge?.close(); })()
   .catch(() => console.error('Bridge shutdown failed.')); };
 await server.connect(new StdioServerTransport());

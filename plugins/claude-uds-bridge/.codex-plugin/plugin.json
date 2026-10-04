@@ -1,6 +1,6 @@
 {
   "name": "claude-uds-bridge",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Guide Codex Desktop and Claude Desktop Code collaboration with free, research and review routines, authored results and versioned assessments.",
   "author": {
     "name": "Jaime Bernal (fork of Leon Kohli)"
@@ -8,10 +8,10 @@
   "license": "MIT",
   "homepage": "https://github.com/jaimebernalm/cc-cdx-bridge",
   "interface": {
-    "displayName": "CC–CDX Bridge",
+    "displayName": "CC\u2013CDX Bridge",
     "shortDescription": "Collaborate, research and review with both agents.",
-    "longDescription": "Choose exact Desktop conversations, continue existing analyses or start new work, collaborate freely or use research/review guidance, record authored results and assessments of exact versions, preserve disagreements and export the exchange. Reception settings still apply. Optional structured coordination adds a current-run analysis barrier, context versions, pause and crash recovery. A shared UI is planned.",
-    "developerName": "Jaime Bernal · based on Leon Kohli's bridge",
+    "longDescription": "Choose exact Desktop conversations, continue existing analyses or start new work, collaborate freely or use research/review guidance, record authored results and assessments of exact versions, preserve disagreements and export the exchange. Reception settings still apply. Optional structured coordination adds a current-run analysis barrier, context versions, pause and crash recovery. A local authenticated panel displays exchanges, results and disagreements and queues human controls for the selected Desktop chat.",
+    "developerName": "Jaime Bernal \u00b7 based on Leon Kohli's bridge",
     "category": "Productivity",
     "capabilities": [
       "Read",
