@@ -4,7 +4,7 @@
 
 Autorizado: planificar, implementar, instalar y probar el panel. Rama `feature/phase-4-local-panel`, desde main `d1ab650` (PR #2 y #3 fusionadas). No publicar PR ni fusionar sin instrucción nueva. No cambiar permisos/recepción. No crear chats de prueba. Preservar los chats Desktop elegidos y datos existentes.
 
-Estado: implementación completada y validada localmente el 4 de octubre de 2026. Distribución 0.6.0 instalada. Rama pendiente de revisión/publicación; validación real del arranque desde chat idle y matriz ampliada de piloto pendientes. `.local/phase4` contiene evidencia privada, no se publica.
+Estado: implementación completada y validada localmente el 4 de octubre de 2026. Distribución 0.6.0 instalada. Rama pendiente de revisión/publicación; arranque desde chat real idle confirmado; retorno de Claude al nuevo chat detenido por su recepción default. Matriz ampliada de piloto pendiente. `.local/phase4` contiene evidencia privada, no se publica.
 
 ## Diseño y decisiones
 
@@ -80,7 +80,7 @@ Las rutas orientativas del plan original se concretan en una única cola de coma
 - Instalación aislada mediante CLI real: versión 0.6.0, hashes de fuentes distribuidas/assets correctos, launcher funciona con PATH reducido. Instalación habitual actualizada sin cambiar recepción ni permisos.
 - Seguridad adicional: dos paneles en puertos distintos usan cookies distintas y no se invalidan entre sí; regresión incluida en la suite. Se corrigió cierre durante wake para esperar las operaciones pendientes.
 - Responsive observado en 420, 750 y 1280 px: sin desbordamiento horizontal. En ventanas intermedias el detalle pasa a una columna; navegación móvil usa tres botones visibles. Tema claro/oscuro y diagnóstico saneado comprobados.
-- La fixture idle usa sockets/IPC reales con modelo simulado. La prueba Desktop de este bloque llegó como steering durante un turno activo, no demuestra arranque desde un chat real inactivo. Ese ensayo sigue pendiente: abrir el panel, dejar el chat elegido inactivo y pulsar Iniciar. No es necesario sustituirlo ni crear un chat CLI.
+- La fixture idle usa sockets/IPC reales con modelo simulado. La primera prueba Desktop llegó como steering durante un turno activo. Ensayo adicional solicitado por el usuario: se creó «Prueba de inicio inactivo — fase 4», se inicializó el plugin y se dejó terminar el turno. El snapshot nativo confirmó idle antes de pulsar Iniciar. El panel activó un nuevo turno en el chat exacto, la orden se aplicó y aparece consumida una sola vez por su clientId nativo. Codex registró la suma y pidió una revisión; la respuesta de Claude quedó held/denied porque el receptor nuevo conserva default y las clases prompting/bypass difieren. El núcleo ocultó el contenido y el chat cerró con disposition incomplete, sin atribuir una revisión. No se cambiaron ajustes. Evidencia privada: idle-before.json, idle-evidence.json, idle-partial-export.json. La repetición del retorno requiere autorización humana para accept temporal solo en ese chat, con restauración posterior.
 
 
 ## Recuperación y siguiente paso
@@ -89,4 +89,4 @@ Las rutas orientativas del plan original se concretan en una única cola de coma
 2. Herramientas requeridas: `collaboration_panel` y `collaboration_panel_command`. Receptor requerido: `panel_commands_v1`, además de las capacidades anteriores. Se verificaron en el catálogo y registro reales.
 3. Al recargar la app apareció el catálogo nuevo pero permaneció el receptor antiguo. Se comprobó identidad nativa/proyecto, ausencia de reservas/entradas pendientes y se guardó copia de la base; después se ejecutaron los hooks instalados SessionEnd/SessionStart solo para este chat. Ajustes Claude byte a byte iguales y ningún chat creado. Evidencia privada: `receiver-reload.json`. No afirmar que recargar la app garantiza reemplazar todo receptor vivo.
 4. Mantener la rama `feature/phase-4-local-panel`; revisar diff, tipos, builds y comprobaciones. Preparar PR solo cuando el usuario lo pida. No fusionar ni publicar automáticamente.
-5. Fase 5: probar inicio real idle, reinicios de apps/servicio, actualización segura de receptores, múltiples proyectos/worktrees y matriz L01–L16. La incertidumbre de recepción efectiva que `doctor` muestra no se resuelve cambiando ajustes sin autorización.
+5. Fase 5: completar retorno autorizado del ensayo idle si procede, reinicios de apps/servicio, actualización segura de receptores, múltiples proyectos/worktrees y matriz L01–L16. La incertidumbre de recepción efectiva que `doctor` muestra no se resuelve cambiando ajustes sin autorización.
