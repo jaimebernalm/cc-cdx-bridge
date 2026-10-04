@@ -1,3 +1,4 @@
+import { version } from '../src/version';
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -24,7 +25,7 @@ try {
   if (marketplace.marketplaceName !== 'jaimebernalm') throw new Error('Unexpected marketplace identity');
   checks.push({ check: 'marketplace', passed: true });
   const installed = await cli(['plugin', 'add', 'claude-uds-bridge@jaimebernalm', '--json']);
-  if (installed.version !== '0.4.0' || installed.pluginId !== 'claude-uds-bridge@jaimebernalm') throw new Error('Unexpected installed plugin');
+  if (installed.version !== version || installed.pluginId !== 'claude-uds-bridge@jaimebernalm') throw new Error('Unexpected installed plugin');
   const listing = await cli(['plugin', 'list', '--marketplace', 'jaimebernalm', '--json']);
   if (!listing.installed?.some((item: { pluginId: string; enabled: boolean }) => item.pluginId === installed.pluginId && item.enabled)) throw new Error('Installed plugin not enabled');
   checks.push({ check: 'installation', passed: true, version: installed.version });

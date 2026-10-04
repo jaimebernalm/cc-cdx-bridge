@@ -101,6 +101,32 @@ export class RunStore {
       const run = this.expire(claim.run_id); return ['active','blocked'].includes(run.state) ? run.id : null;
     }).immediate();
   }
+  // A transport receipt survives /clear, but the managed conversation binding does not.
+  private samePeerProcess(participant: Participant, peer: Pick<Peer, 'pid' | 'procStart' | 'messagingSocketPath'>) {
+    return participant.pid === peer.pid && participant.procStart === peer.procStart
+      && participant.socketPath === peer.messagingSocketPath;
+  }
+  activeForPeer(peer: Pick<Peer, 'sessionId' | 'pid' | 'procStart' | 'messagingSocketPath'>) {
+    const exact = this.activeFor(peer.sessionId);
+    if (exact) return exact;
+    const claims = this.db.query<{ run_id: string; snapshot: string }, []>(
+      "SELECT p.run_id,p.snapshot FROM participants p JOIN session_claims c ON c.run_id=p.run_id AND c.session_id=p.session_id WHERE p.provider='claude'").all();
+    for (const claim of claims) {
+      const participant = JSON.parse(claim.snapshot) as Participant;
+      if (!this.samePeerProcess(participant, peer) || !this.activeFor(participant.sessionId)) continue;
+      this.block(claim.run_id, 'participant_session_changed');
+      return claim.run_id;
+    }
+    return null;
+  }
+  observePeerSession(threadId: string, peer: Peer) {
+    const id = this.activeFor(threadId);
+    if (!id) return false;
+    const participant = this.participants(id).find(p => p.provider === 'claude');
+    if (!participant || participant.sessionId === peer.sessionId || !this.samePeerProcess(participant, peer)) return false;
+    this.block(id, 'participant_session_changed');
+    return true;
+  }
   prepare(owner: string, requestId: string, context: Context, limits: Limits, participants: Participant[], comparison: unknown, routine?: RoutineInput) {
     uuid.parse(owner); uuid.parse(requestId); context = contextSchema.parse(context); limits = limitsSchema.parse(limits);
     const normalized = normalizeRoutine(routine,context.priorAnalysis);
@@ -124,6 +150,10 @@ export class RunStore {
       const run = this.expire(id); if (run.state === 'active') return;
       if (run.state !== 'prepared') throw new Error(`Cannot start a ${run.state} collaboration`);
       const participants = this.participants(id);
+      for (const peer of participants.filter(p => p.provider === 'claude')) {
+        const claim = this.activeForPeer({ ...peer, messagingSocketPath: peer.socketPath });
+        if (claim && claim !== id) throw new Error('Participant process already belongs to an active collaboration; close it before selecting the new session');
+      }
       for (const peer of participants) {
         const claim = this.db.query<{run_id:string},[string]>('SELECT run_id FROM session_claims WHERE session_id=?').get(peer.sessionId);
         if (claim) this.expire(claim.run_id);
@@ -209,11 +239,11 @@ export class RunStore {
       this.event(row.run_id,'transport_status','core',{messageId,status}); this.block(row.run_id,`transport:${status}`);
     }
   }
-  allowOutgoingFrame(owner: string, frame: Frame) {
+  allowOutgoingFrame(owner: string, frame: Frame, peer?: Peer) {
     if (frame.type !== 'user') return true;
     let parsed: ReturnType<typeof parseManaged>;
     try { parsed=parseManaged(frame.message.content); } catch { return false; }
-    if (!parsed) return !frame.session_id || !this.activeFor(frame.session_id);
+    if (!parsed) return peer ? !this.activeForPeer(peer) : !frame.session_id || !this.activeFor(frame.session_id);
     const message=this.db.query<MessageRow,[string]>('SELECT * FROM run_messages WHERE id=?').get(parsed.header.messageId);
     if (!message || message.run_id!==parsed.header.runId || message.direction!=='out' || message.transport_id!==frame.msg_id
       || message.peer_id!==frame.session_id || !message.delivery_claimed || message.status!=='submitting' || message.wire_hash!==digest(frame.message.content)) return false;
@@ -236,6 +266,7 @@ export class RunStore {
     }).immediate();
   }
   admitIncoming(threadId: string, peer: Peer, transportId: string, wire: string) {
+    if (this.observePeerSession(threadId, peer)) return {managed:true,admitted:false,reason:'participant-session-changed'};
     let parsed: ReturnType<typeof parseManaged>;
     try { parsed = parseManaged(wire); }
     catch { return {managed:true,admitted:false,reason:'invalid-correlation'}; }

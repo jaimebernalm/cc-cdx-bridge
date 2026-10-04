@@ -1,6 +1,6 @@
 {
   "name": "claude-uds-bridge",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Guide Codex Desktop and Claude Desktop Code collaboration with free, research and review routines, authored results and versioned assessments.",
   "author": {
     "name": "Jaime Bernal (fork of Leon Kohli)"
