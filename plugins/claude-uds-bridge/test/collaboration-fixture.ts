@@ -13,8 +13,8 @@ import {Bridge} from '../src/bridge';
 import {receiver} from './desktop-fixture';
 const pluginRoot=resolve(import.meta.dir,'..');
 export async function until(check:()=>boolean){const deadline=Date.now()+4000;while(!check()&&Date.now()<deadline)await Bun.sleep(10);expect(check()).toBe(true);}
-export async function nativeFixture(dropAcknowledgement=false){
- const root=mkdtempSync('/tmp/phase2-native-');const desktop=await receiver('idle',dropAcknowledgement,false,root);const config=join(root,'claude');const state=join(root,'plugin-state/claude-uds-bridge');const sockets=join(root,'s');
+export async function nativeFixture(dropAcknowledgement=false,options:{root?:string;rejectUnknownOwners?:boolean}={}){
+ const root=options.root??mkdtempSync('/tmp/phase2-native-');const desktop=await receiver('idle',dropAcknowledgement,false,root,options);const config=join(root,'claude');const state=join(root,'plugin-state/claude-uds-bridge');const sockets=join(root,'s');
  mkdirSync(join(config,'sessions'),{recursive:true,mode:0o700});mkdirSync(sockets,{mode:0o700});const peerId=randomUUID();const peerSocket=join(sockets,process.ppid+'.sock');const frames:ReturnType<typeof frameSchema.parse>[]=[];const clients=new Set<net.Socket>();
  const server=net.createServer(socket=>{clients.add(socket);socket.on('error',()=>{});socket.on('close',()=>clients.delete(socket));socket.setEncoding('utf8');let buffer='';socket.on('data',chunk=>{buffer+=chunk;let end;while((end=buffer.indexOf('\n'))>=0){frames.push(frameSchema.parse(JSON.parse(buffer.slice(0,end))));buffer=buffer.slice(end+1);}});});server.listen(peerSocket);await once(server,'listening');chmodSync(peerSocket,0o600);
  writeFileSync(join(config,'sessions',process.ppid+'.json'),JSON.stringify({pid:process.ppid,procStart:await processStart(process.ppid),sessionId:peerId,messagingSocketPath:peerSocket,cwd:root,name:'Claude test',entrypoint:'claude-desktop',status:'idle',version:'2.1.286',peerProtocol:1}),{mode:0o600});

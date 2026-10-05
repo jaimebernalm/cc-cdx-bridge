@@ -9,6 +9,20 @@ export const authorizationChangeSchema=authorizationIdentitySchema.extend({actio
 type Change=z.infer<typeof authorizationChangeSchema>;
 type Row={project:string;device:string;inode:string;enabled:number;revision:number;updated_at:number;actor:string};
 function folder(path:string){const project=realpathSync(path),stat=statSync(project,{bigint:true});if(!stat.isDirectory())throw new Error('Project must be a directory');return {project,device:String(stat.dev),inode:String(stat.ino)};}
+function observedStatus(path:string,r:Row|null){
+  const f=folder(path),valid=!!r&&r.device===f.device&&r.inode===f.inode;
+  return {project:f.project,enabled:valid&&r.enabled===1,revision:r?.revision??0,updatedAt:r?.updated_at??null,actor:r?.actor??null,folderChanged:!!r&&!valid,scope:'managed_same_directory' as const};
+}
+// Diagnostics must neither create state nor migrate an existing database.
+export function observeProjectAuthorization(stateDir:string,path:string){
+  const file=join(stateDir,'project-authorizations.sqlite');
+  if(!existsSync(file))return observedStatus(path,null);
+  privateDirectory(stateDir);const s=lstatSync(file);
+  if(!s.isFile()||s.isSymbolicLink()||s.uid!==process.getuid?.()||(s.mode&0o077))throw new Error('Project authorization state must be a private owned file');
+  const db=new Database(file,{readonly:true});
+  try{return observedStatus(path,db.query<Row,[string]>('SELECT * FROM project_authorizations WHERE project=?').get(folder(path).project));}
+  finally{db.close();}
+}
 export class ProjectAuthorizations {
   private db:Database;
   constructor(stateDir:string,private now=()=>Date.now()){
@@ -22,8 +36,7 @@ export class ProjectAuthorizations {
   }
   status(path:string){
     const f=folder(path),r=this.db.query<Row,[string]>('SELECT * FROM project_authorizations WHERE project=?').get(f.project);
-    const valid=!!r&&r.device===f.device&&r.inode===f.inode;
-    return {project:f.project,enabled:valid&&r.enabled===1,revision:r?.revision??0,updatedAt:r?.updated_at??null,actor:r?.actor??null,folderChanged:!!r&&!valid,scope:'managed_same_directory' as const};
+    return observedStatus(path,r);
   }
   allows(path:string,receivedAt:number){try{const s=this.status(path);return s.enabled&&s.updatedAt!==null&&receivedAt>s.updatedAt;}catch{return false;}}
   change(raw:Change){

@@ -10,6 +10,7 @@ import { PeerGuard } from './guard';
 import { RunStore } from './runs';
 import { ProjectAuthorizations } from './project-authorization';
 import { inspectParticipant, matchesProcess, sameSnapshot } from './participants';
+import { version } from './version';
 
 type Message = { id: string; peer_id: string; direction: string; text: string; status: string; turn_id: string | null;
   peer_address: string | null; peer_start: string | null; from_mode: string | null; expires_at: number | null; kind: string; drop_reason: string | null; status_reason: string | null };
@@ -168,6 +169,7 @@ export class Bridge {
         this.db.run("INSERT INTO receiver_capabilities VALUES ('structured_runs_v1',?,?)",[process.pid,procStart]);
         this.db.run("INSERT INTO receiver_capabilities VALUES ('panel_commands_v1',?,?)",[process.pid,procStart]);
         this.db.run("INSERT INTO receiver_capabilities VALUES ('project_authorization_v1',?,?)",[process.pid,procStart]);
+        this.db.run('INSERT INTO receiver_capabilities VALUES (?,?,?)',[`distribution_version:${version}`,process.pid,procStart]);
       })();
       this.ownsReceiver = true;
       this.db.run("UPDATE messages SET status='unknown' WHERE status='submitting'");

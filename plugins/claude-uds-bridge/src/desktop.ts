@@ -134,6 +134,7 @@ class DesktopConnection {
   }
 
   async inputs() { return desktopInputs(await this.snapshot()); }
+  async inputSnapshot() {const state=await this.snapshot();return {project:state.cwd,inputs:desktopInputs(state)};}
 
   async project() { return (await this.snapshot()).cwd; }
 
@@ -301,6 +302,12 @@ export async function readDesktopInputs(path: string, threadId: string) {
   const connection = new DesktopConnection(path, threadId);
   try { await connection.connect(); return await connection.inputs(); }
   finally { connection.close(); }
+}
+
+export async function readDesktopInputSnapshot(path:string,threadId:string){
+  const connection=new DesktopConnection(path,threadId);
+  try{await connection.connect();return await connection.inputSnapshot();}
+  finally{connection.close();}
 }
 
 export async function readDesktopProject(path: string, threadId: string) {

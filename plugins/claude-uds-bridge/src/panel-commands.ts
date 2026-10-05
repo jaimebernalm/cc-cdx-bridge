@@ -20,7 +20,7 @@ export const panelActionSchema = z.discriminatedUnion('action',[
 ]);
 export const panelRequestSchema=z.object({commandId:uuid,ownerThread:uuid,project:z.string().min(1).max(4096),command:panelActionSchema}).strict();
 export type PanelRequest=z.infer<typeof panelRequestSchema>;
-export type PanelCommand={id:string;owner:string;project:string;payload:string;hash:string;state:string;created_at:number;input_id:string;run_id:string|null;error:string|null;result:string|null;processor_pid:number|null;processor_start:string|null};
+export type PanelCommand={id:string;owner:string;project:string;payload:string;hash:string;state:string;created_at:number;input_id:string;run_id:string|null;error:string|null;result:string|null;processor_pid:number|null;processor_start:string|null;reconciliation_note:string|null};
 
 export class PanelCommands {
   private db:Database;
@@ -31,21 +31,27 @@ export class PanelCommands {
     const columns=this.db.query<{name:string},[]>('PRAGMA table_info(panel_commands)').all();
     if(!columns.some(c=>c.name==='processor_pid'))this.db.exec('ALTER TABLE panel_commands ADD COLUMN processor_pid INTEGER;');
     if(!columns.some(c=>c.name==='processor_start'))this.db.exec('ALTER TABLE panel_commands ADD COLUMN processor_start TEXT;');
+    if(!columns.some(c=>c.name==='reconciliation_note'))this.db.exec('ALTER TABLE panel_commands ADD COLUMN reconciliation_note TEXT;');
   }
   get(id:string){return this.db.query<PanelCommand,[string]>('SELECT * FROM panel_commands WHERE id=?').get(uuid.parse(id));}
   list(owner?:string){return owner?this.db.query<PanelCommand,[string]>('SELECT * FROM panel_commands WHERE owner=? ORDER BY created_at DESC LIMIT 200').all(owner):this.db.query<PanelCommand,[]>('SELECT * FROM panel_commands ORDER BY created_at DESC LIMIT 200').all();}
-  enqueue(input:PanelRequest){input=panelRequestSchema.parse(input);input.project=realpathSync(input.project);const hash=createHash('sha256').update(JSON.stringify(input)).digest('hex');
+  enqueue(input:PanelRequest,wakeStart?:string){input=panelRequestSchema.parse(input);input.project=realpathSync(input.project);const hash=createHash('sha256').update(JSON.stringify(input)).digest('hex');
     return this.db.transaction(()=>{const old=this.get(input.commandId);if(old){if(old.hash!==hash)throw new Error('Command ID reused with different content');return {command:old,reused:true};}
-      this.db.run('INSERT INTO panel_commands(id,owner,project,payload,hash,state,created_at,input_id) VALUES (?,?,?,?,?,\'queued\',?,?)',[input.commandId,input.ownerThread,input.project,JSON.stringify(input.command),hash,Date.now(),randomUUID()]);return {command:this.get(input.commandId)!,reused:false};}).immediate();
+      this.db.run('INSERT INTO panel_commands(id,owner,project,payload,hash,state,created_at,input_id,processor_pid,processor_start) VALUES (?,?,?,?,?,?,?,?,?,?)',[input.commandId,input.ownerThread,input.project,JSON.stringify(input.command),hash,wakeStart?'waking':'queued',Date.now(),randomUUID(),wakeStart?process.pid:null,wakeStart??null]);return {command:this.get(input.commandId)!,reused:false};}).immediate();
   }
   beginWake(id:string,procStart:string){return this.db.run("UPDATE panel_commands SET state='waking',processor_pid=?,processor_start=? WHERE id=? AND state='queued'",[process.pid,procStart,id]).changes===1;}
   wakeResult(id:string,status:string,error?:string){this.db.run("UPDATE panel_commands SET state=?,error=? WHERE id=? AND state='waking'",[status,error??null,id]);}
-  consumed(id:string){this.db.run("UPDATE panel_commands SET state='notified',error=NULL WHERE id=? AND state='unknown'",[id]);}
+  consumed(id:string){this.db.run("UPDATE panel_commands SET state='notified',error=NULL,reconciliation_note=NULL WHERE id=? AND state='unknown'",[id]);}
+  reconciliationIssue(ids:string[],note:string){for(const id of ids)this.db.run("UPDATE panel_commands SET reconciliation_note=? WHERE id=? AND state='unknown'",[note,id]);}
   async inspectApplications(){for(const row of this.db.query<PanelCommand,[]>("SELECT * FROM panel_commands WHERE state IN ('applying','waking')").all()){
     if(!row.processor_pid||!row.processor_start||await processStart(row.processor_pid).catch(()=>null)!==row.processor_start)
       this.db.run("UPDATE panel_commands SET state=?,error='Process ended during delivery/application; inspect before a new action' WHERE id=? AND state=?",[row.state==='waking'?'unknown':'application_uncertain',row.id,row.state]);
-  }}
-  public(row:PanelCommand){return {id:row.id,ownerThread:row.owner,project:row.project,action:JSON.parse(row.payload).action,state:row.state,createdAt:row.created_at,runId:row.run_id,error:row.error,result:row.result?JSON.parse(row.result):null};}
+  }
+    // Legacy queued rows have no recorded wake owner. Never replay them. New
+    // API commands atomically record waking + owner in enqueue's transaction.
+    this.db.run("UPDATE panel_commands SET state='unknown',error='No recorded wake owner; inspect the durable command before a new action' WHERE state='queued' AND created_at<?",[Date.now()-15000]);
+  }
+  public(row:PanelCommand){return {id:row.id,ownerThread:row.owner,project:row.project,action:JSON.parse(row.payload).action,state:row.state,createdAt:row.created_at,runId:row.run_id,error:row.error,inspection:row.reconciliation_note,result:row.result?JSON.parse(row.result):null};}
   async apply(id:string,c:Collaboration,project:string){const row=this.get(id);if(!row||row.owner!==c.owner||row.project!==project)throw new Error('Panel command belongs to another conversation or project');
     if(row.state==='applied')return {...JSON.parse(row.result!),reused:true};
     const procStart=await processStart(process.pid);

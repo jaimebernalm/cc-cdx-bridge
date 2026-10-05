@@ -13,6 +13,8 @@ test('session hooks own one receiver per task, restore it after resume and clean
   const ipcDir = join(codexHome, 'ipc');
   mkdirSync(ipcDir, { recursive: true, mode: 0o700 });
   mkdirSync(join(root, 'cc-socks'), { mode: 0o755 });
+  // The deliberately unsafe fixture must remain 0755 even under a private umask.
+  chmodSync(join(root, 'cc-socks'), 0o755);
   const clients = new Set<net.Socket>();
   let pauseHandshake = false;
   let releaseHandshake: (() => void) | undefined;
