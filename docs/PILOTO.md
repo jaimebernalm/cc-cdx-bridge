@@ -1,6 +1,6 @@
 # Piloto 0.7.0: uso y recuperación
 
-Candidata local en `feature/phase-5-pilot-hardening`, sin release ni fusión; rama publicada para CI. Plan y evidencia: [FASE_5.md](FASE_5.md) y [PILOT_EVIDENCE.json](PILOT_EVIDENCE.json). Reapertura completa de apps, pausa/contexto y continuación real verificadas con 0.7.0; los ensayos de chats nuevos y nombres iguales están autorizados y en curso. El primer ensayo rechazó una respuesta con formato inválido; se corrigió la guía y queda pendiente la repetición válida y limpieza.
+Candidata local en `feature/phase-5-pilot-hardening`, sin release ni fusión; rama publicada para CI. Plan y evidencia: [FASE_5.md](FASE_5.md) y [PILOT_EVIDENCE.json](PILOT_EVIDENCE.json). Reapertura completa de apps, pausa/contexto y continuación real verificadas con 0.7.0; los ensayos de chats nuevos y nombres iguales pasan con recepción default heredada. Se corrigió una guía de formatos ambigua y se conserva el intento fallido. Codex temporal archivado; Claude pendiente de archivado al desbloquear el Mac. L08 nativo se respalda con evidencia histórica y regresión actual, sin afirmarlo repetido en 0.7.0.
 
 ## Cambios
 

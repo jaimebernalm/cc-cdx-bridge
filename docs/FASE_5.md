@@ -68,11 +68,12 @@ La evidencia previa de fase 4 se puede reutilizar indicando fecha y versión. No
 - [x] Ciclo instalación/actualización/desinstalación/reinstalación real.
 - [x] Entornos aislados con espacios, alias iguales y worktrees.
 - [x] Generador de informe compartible por lista permitida y regresión.
-- [x] Tipos, build, pruebas fuente y bundle: 135/135 y 1035 aserciones en cada suite local.
+- [x] Tipos, build, pruebas fuente y bundle: 136/136 y 1051 aserciones en cada suite local.
 - [x] Ensayos nativos y UI ejecutados; inventario L01–L18 con pendientes explícitos.
 - [x] CI de fuente/bundles en Linux y macOS.
 - [x] Reapertura completa de apps con MCP y receptor 0.7.0, historial y autorización conservados.
-- [ ] Cierre de casos nativos L06/L17: autorización recibida, dos chats temporales creados; repetir tras corregir formato de respuesta y archivar al terminar.
+- [x] Casos nativos L06/L17: chats nuevos, homónimos y recepción heredada; repetición válida con formato corregido.
+- [ ] Limpieza: Codex temporal archivado; Claude temporal pendiente porque el Mac está bloqueado.
 - [x] Notas del piloto y guía de recuperación en PILOTO.md.
 - [x] Instalación local 0.7.0 y recarga supervisada de receptores; políticas y autorización preservadas.
 
@@ -101,7 +102,7 @@ Esta tabla distingue pruebas con modelos Desktop de fixtures. «Pendiente» no e
 | L03 | Pasado en el ensayo `REAL_P5_TOOL_702`: mismo PID, herramienta de 35,002111 s y exit 0. Segundo mensaje reservado a +29,781409 s y escrito en el socket 4,897702 s antes del fin; ambas respuestas correlacionadas consumidas una vez. Claude lo leyó al devolver Bash; no se afirma lectura instantánea. Los intentos anteriores no acreditan concurrencia. |
 | L04 | Pasado con 0.7.0 tras reapertura: existing/existing desde la UI con resúmenes reales atribuidos; Claude confirmó su fidelidad y continuó sin repetir investigación. No hay importación automática de historia. |
 | L05 | Pasado: inicio mixto con análisis previo de Codex y análisis nuevo de Claude, procedencia explícita. |
-| L06 | Fixtures pasan con alias iguales e identidades exactas. No se crearon dos conversaciones Claude reales con nombres iguales; ensayo nativo pendiente. |
+| L06 | Pasado en Desktop: dos Claude del mismo nombre/carpeta se distinguen por sufijo único en la UI. El nuevo recibió y respondió al run correcto; las filas del Claude anterior permanecen idénticas a la línea base. |
 | L07 | Pasado: chat `default` usa autorización existente sin cambio de políticas ni ajustes durante el ensayo. La comparación de Claude es contra la línea base de este turno, no contra toda la historia del proyecto. |
 | L08 | Fixtures prueban prioridad de política explícita y bloqueo. Los ensayos nativos de retención/denegación son históricos de fase 4; no se cambiaron los permisos reales para repetirlos ahora. |
 | L09 | Pasado nativo 0.7.0 desde UI: pausa aplicada, envío rechazado sin admisión ni consumo de presupuesto, reanudación aplicada y nueva respuesta válida. No se interrumpieron herramientas; no había ninguna en ejecución en este ensayo. |
@@ -112,7 +113,7 @@ Esta tabla distingue pruebas con modelos Desktop de fixtures. «Pendiente» no e
 | L14 | Pasado nativo 0.7.0: una instrucción desde UI creó contexto 2, tarea local de contexto 1 quedó stale y su informe fue rechazado tras reanudar. La respuesta de Claude pertenece a contexto 2. Los casos de respuesta tardía de contexto antiguo siguen respaldados por fixtures. |
 | L15 | Pasado: cierre útil con objeciones explícitas y `validatedConsensus:false`. |
 | L16 | Pasado: inicio desde panel en conversación Desktop original inactiva, sin sustituirla por un modelo CLI. |
-| L17 | CLI real instala/actualiza/desinstala/reinstala en home aislado; MCP y receptor del chat existente verificados 0.7.0 tras reapertura. El ensayo de un chat Desktop nuevo sigue pendiente de autorización explícita para crearlo. |
+| L17 | Pasado: instalación real aislada y chat Desktop nuevo con receptor/MCP 0.7.0 desde inicio, sin attach manual. Política default y grant revisión 1; orden y respuesta nativas consumidas una vez. Se verificó la guía corregida en el wire del MCP nuevo. La presencia del receptor no certifica por sí sola la confianza del hook. |
 | L18 | Pasado: reactivación supervisada de los chats existentes, receptor único y conservación de historial/política; ensayo final sin duplicados. |
 
 ## Punto de continuidad tras reapertura (4 de octubre, noche local)
@@ -157,3 +158,20 @@ Pasos siguientes, sin nueva aprobación:
 4. Comprobar respuesta admitida y consumida exactamente una vez por el nuevo Codex, orden aplicada/consumida una vez, ninguna nueva fila para el Claude antiguo, hash de settings igual a línea base, grant y políticas intactos. Guardar exportación/evidencia privada; no copiar texto denegado al modelo.
 5. Cerrar el ensayo, archivar exactamente los dos chats temporales, confirmar limpieza y actualizar L06/L17 solo si estas pruebas pasan. L08 nativo actual sigue distinto de la evidencia histórica.
 6. Publicar commit/CI del arreglo y actualizar plan/evidencia saneada. No hay autorización nueva de PR/fusión de fase 5.
+
+
+## Resultado de la repetición L06/L17
+
+El ensayo nuevo `REAL_P5_NEW_706` se ejecutó con checkout limpio en `0b440699f2bd85ef9da6f9cdb1cb3b9d186554f9`. Reutilizó exactamente los dos chats temporales autorizados; se reabrió el Codex temporal después de quedar archivado, sin crear otro ni cambiar políticas. La nueva instancia MCP usó la orientación corregida, comprobada contra su wire persistido.
+
+Pasó con dos mensajes, un informe Claude válido, resultado Codex v1 y cierre `proposal`/`completed`, `validatedConsensus:false`. La orden del panel y la respuesta entrante tienen una sola entrada consumida cada una en el historial nativo. Este hecho se comprobó aparte del ACK del núcleo, que en el resultado del agente todavía figuraba sin `consumed_at`. No se afirma que el núcleo conociera el consumo en aquel momento.
+
+Recepción `default`, receptor 0.7.0, autorización enabled/revisión 1 y hash de ajustes Claude iguales a la línea base original. El Claude homónimo anterior no recibió nuevas filas y sus filas existentes se mantuvieron byte a byte al serializarlas. Se conservaron seis órdenes antiguas y se liberaron las reservas. La suma 33 + 9 = 42 se verificó; el marcador inicial de Claude es una declaración atribuida sobre su historial, no prueba independiente. El intento 705 fallido sigue separado y terminal.
+
+Evidencia privada: `new-705-before.json`, `new-705-rejected-export.json`, `new-706-evidence.json`, `new-706-export.json`, `new-evidence.ts`, `new-706-selected.png`, `panel-new-706-completed.png`. Los tokens y transcriptos no se publican. La UI muestra resultado final, dos de cuatro mensajes y cero encargos pendientes.
+
+El chat Codex temporal ya está archivado tras completar la prueba y quedar inactivo. El Claude temporal sigue inactivo y pendiente de archivado: el control nativo exige desbloquear el Mac. La pregunta de desbloqueo está pendiente; no es una autorización nueva ni se deben cambiar permisos. Al continuar: abrir solo el Claude con identidad exacta de `new-706-evidence.json`, archivar mediante UI y conservar el Claude original del mismo nombre. No repetir el run ni crear nuevos chats para esa limpieza.
+
+CI del arreglo `0b440699f2bd85ef9da6f9cdb1cb3b9d186554f9`: [37265302282](https://github.com/jaimebernalm/cc-cdx-bridge/actions/runs/37265302282), fuente y bundles aprobados en Linux y macOS; comprobación de bundle contra fuente aprobada en Linux. Suites locales: 136/0 y 1051 aserciones por suite. La rama sigue publicada, sin PR/fusión/release de fase 5.
+
+La matriz actual contiene 17 casos nativos pasados en 0.7.0. L08 de retención/denegación se conserva como evidencia nativa histórica de fase 4 y regresión automatizada actual; no se presenta como ensayo nativo nuevo de 0.7.0. El rechazo del sobre inválido en 705 aporta un negativo adicional, pero no sustituye un ensayo de políticas hold/refuse con un sobre válido. Implementación y ensayos autorizados de fase 5 verificados; el cierre administrativo sigue pendiente de limpiar Claude.
