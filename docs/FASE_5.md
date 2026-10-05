@@ -69,7 +69,9 @@ La evidencia previa de fase 4 se puede reutilizar indicando fecha y versión. No
 - [x] Entornos aislados con espacios, alias iguales y worktrees.
 - [x] Generador de informe compartible por lista permitida y regresión.
 - [x] Tipos, build, pruebas fuente y bundle: 135/135 y 1035 aserciones en cada suite local.
-- [ ] Pruebas nativas y UI; inventario honesto L01–L18.
+- [x] Ensayos nativos y UI ejecutados; inventario L01–L18 con pendientes explícitos.
+- [x] CI de fuente/bundles en Linux y macOS.
+- [ ] Reapertura completa de apps con 0.7.0 y casos nativos pendientes de la matriz.
 - [x] Notas del piloto y guía de recuperación en PILOTO.md.
 - [x] Instalación local 0.7.0 y recarga supervisada de receptores; políticas y autorización preservadas.
 
@@ -83,4 +85,40 @@ Investigación real `REAL_P5_RESEARCH_701` completada con seis mensajes (tres pr
 
 Panel CLI reiniciado de verdad: aviso visible de servicio detenido, credencial nueva, historial/ordenes persistentes. Nuevo servicio en `.local/phase5/panel-restarted.jsonl`, sesión de exec 71374. No publicar el token. Receptores de los dos chats de este proyecto son 0.7.0 y mantienen `accept` (propietario) y `default` (prueba), autorización de carpeta revision 1. MCP de chats ya abiertos puede seguir antiguo: no confundirlo con la versión del receptor.
 
-Pendiente inmediato: prueba final desde panel en el chat nativo inactivo existente, resultado/review y export, comparación de entradas únicas y ajustes; CI nueva Linux/macOS en esta rama; inventario final L01–L18. No cerrar Codex durante el turno. Se observó otra respuesta activa en Claude Desktop, por lo que no se cerró toda esa app. Si el usuario facilita una reapertura al finalizar, validar la distribución completa tras esa reapertura; hasta entonces no atribuir a 0.7.0 un reinicio completo de ambas apps.
+El ensayo final `REAL_P5_IDLE_701` desde el panel despertó el chat nativo inactivo, recibió la revisión exacta de Claude y terminó con dos mensajes. Orden consumida una vez, respuesta consumida, ninguna reserva pendiente y seis órdenes anteriores conservadas. Receptor 0.7.0; política `default`, autorización de carpeta revisión 1 y ajustes de Claude idénticos a la línea base privada de este turno. Cierre `validatedConsensus:false`. Evidencia privada: `idle-real-evidence.json` y `idle-real-export.json`.
+
+CI Linux/macOS aprobada sobre `0e1b6d6`: [ejecución 37251746068](https://github.com/jaimebernalm/cc-cdx-bridge/actions/runs/37251746068). Se publica la rama para ejecutar CI; no se abrió PR ni se fusionó/publicó una release de fase 5. La CI también comprueba los ajustes finales de UI (cierre sin resultado y objetivo largo desplegable) y su bundle; consultar la ejecución del HEAD antes de preparar PR.
+
+## Inventario final de ensayos reales
+
+Esta tabla distingue pruebas con modelos Desktop de fixtures. «Pendiente» no equivale a un fallo de la suite automatizada. El resumen [PILOT_EVIDENCE.json](PILOT_EVIDENCE.json) omite rutas, identidades, texto libre y credenciales.
+
+| Caso | Evidencia de esta fase y límite |
+|---|---|
+| L01 | Pasado: investigación/revisión con el chat propietario activo; seis mensajes correlacionados, consumidos. |
+| L02 | Pasado: chat Codex inactivo despertado desde UI, dos mensajes y cierre. |
+| L03 | Parcial: se envió una segunda tarea con Claude observado ocupado; completó sus ocho tests sin interrupción. No hay marcas de tiempo que prueben llegada durante su herramienta. Repetir con esa evidencia antes de dar el caso completo por pasado. |
+| L04 | No repetido con 0.7.0: continuación de dos análisis previos comprobada en fases anteriores. |
+| L05 | Pasado: inicio mixto con análisis previo de Codex y análisis nuevo de Claude, procedencia explícita. |
+| L06 | Fixtures pasan con alias iguales e identidades exactas. No se crearon dos conversaciones Claude reales con nombres iguales; ensayo nativo pendiente. |
+| L07 | Pasado: chat `default` usa autorización existente sin cambio de políticas ni ajustes durante el ensayo. La comparación de Claude es contra la línea base de este turno, no contra toda la historia del proyecto. |
+| L08 | Fixtures prueban prioridad de política explícita y bloqueo. Los ensayos nativos de retención/denegación son históricos de fase 4; no se cambiaron los permisos reales para repetirlos ahora. |
+| L09 | UI aislada: pausa/reanudación correctas. Evidencia nativa de fase 4 reutilizable como histórica, no atribuida a 0.7.0. |
+| L10 | Cancelación desde UI aislada y tests de llegada tardía pasan. Falta provocar deliberadamente una respuesta tardía en una app real con 0.7.0. |
+| L11 | Servicio de panel y receptores reiniciados con historial conservado y sin duplicados. Reinicio completo de ambas apps con 0.7.0 pendiente: Codex ejecuta este turno y otra conversación Claude estaba trabajando. No cerrar las apps automáticamente en esas condiciones. |
+| L12 | Pasado: investigación de código, contraste, ejecución de ocho tests por Claude y resultado revisado. No prueba mejora de calidad frente a un agente solo. |
+| L13 | Pasado: revisión de versión exacta, matices visibles, cierre del autor con desacuerdos; arreglos posteriores respaldados por regresiones. La revisión no audita esos arreglos posteriores. |
+| L14 | UI aislada: contexto 2 y controles correctos; invalidación de tareas antiguas cubierta por tests. Evidencia nativa de contexto 2 pertenece a fase 4, no se repitió ahora. |
+| L15 | Pasado: cierre útil con objeciones explícitas y `validatedConsensus:false`. |
+| L16 | Pasado: inicio desde panel en conversación Desktop original inactiva, sin sustituirla por un modelo CLI. |
+| L17 | CLI real instala/actualiza/desinstala/reinstala en home aislado. Receptores reales recargados con 0.7.0. No se creó un chat Desktop nuevo ni se verificó su nuevo MCP tras reiniciar toda la app; pendiente. |
+| L18 | Pasado: reactivación supervisada de los chats existentes, receptor único y conservación de historial/política; ensayo final sin duplicados. |
+
+## Último paso tras la reapertura
+
+1. Dejar terminar cualquier trabajo de Claude y cerrar/reabrir Codex y Claude Desktop; no modificar permisos.
+2. Volver a este chat, leer esta sección y el inventario; comprobar distribución cargada, capacidades, proyecto exacto y receptor único.
+3. Consultar el ensayo final ya cerrado y sus entradas antes de enviar nada. No reabrir/repetir su orden. Comprobar historia y autorización revisión 1 conservadas.
+4. Ejecutar una colaboración nueva y breve desde el panel con el chat de prueba existente; correlacionar respuesta y contar entradas. Registrar por separado MCP y receptor 0.7.0 y marcar L11 solo después de esa evidencia.
+5. Para L03, registrar inicio/fin de una herramienta acotada de Claude y comprobar que el segundo mensaje se envió entre ambos, sin interrumpirla. L06, L10 y L17 necesitan ensayos nativos separados; un chat nuevo requiere petición explícita del usuario, no la sustituye un fixture.
+6. Actualizar esta tabla y el resumen saneado. No anunciar la matriz completa ni la fase 5 cerradas antes de resolver esos pendientes.

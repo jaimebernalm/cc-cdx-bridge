@@ -1,0 +1,170 @@
+{
+  "schemaVersion": 1,
+  "version": "0.7.0",
+  "platform": "darwin",
+  "runtime": "1.4.2",
+  "checks": [
+    {
+      "check": "marketplace_with_spaces",
+      "passed": true
+    },
+    {
+      "check": "previous_distribution_installation",
+      "passed": true
+    },
+    {
+      "check": "update_preserves_private_state",
+      "passed": true
+    },
+    {
+      "check": "installed_files_match_checkout",
+      "passed": true
+    },
+    {
+      "check": "installed_launcher_reduced_path",
+      "passed": true
+    },
+    {
+      "check": "uninstall_removes_cache_preserves_private_state",
+      "passed": true
+    },
+    {
+      "check": "reinstall_restores_history_command_and_authorization",
+      "passed": true
+    },
+    {
+      "check": "types",
+      "passed": true
+    },
+    {
+      "check": "ui_types",
+      "passed": true
+    },
+    {
+      "check": "build",
+      "passed": true
+    },
+    {
+      "check": "source_suite",
+      "passed": true,
+      "count": 135
+    },
+    {
+      "check": "bundle_suite",
+      "passed": true,
+      "count": 135
+    },
+    {
+      "check": "panel_restart",
+      "passed": true
+    },
+    {
+      "check": "worktrees",
+      "passed": true
+    },
+    {
+      "check": "native_roundtrip",
+      "passed": true
+    },
+    {
+      "check": "ui_regression",
+      "passed": true
+    },
+    {
+      "check": "native_app_restart",
+      "passed": false
+    }
+  ],
+  "realCases": [
+    {
+      "case": "L01",
+      "outcome": "passed",
+      "version": "0.7.0"
+    },
+    {
+      "case": "L02",
+      "outcome": "passed",
+      "version": "0.7.0"
+    },
+    {
+      "case": "L03",
+      "outcome": "blocked",
+      "version": "0.7.0"
+    },
+    {
+      "case": "L04",
+      "outcome": "not_run",
+      "version": "0.7.0"
+    },
+    {
+      "case": "L05",
+      "outcome": "passed",
+      "version": "0.7.0"
+    },
+    {
+      "case": "L06",
+      "outcome": "not_run",
+      "version": "0.7.0"
+    },
+    {
+      "case": "L07",
+      "outcome": "passed",
+      "version": "0.7.0"
+    },
+    {
+      "case": "L08",
+      "outcome": "not_run",
+      "version": "0.7.0"
+    },
+    {
+      "case": "L09",
+      "outcome": "not_run",
+      "version": "0.7.0"
+    },
+    {
+      "case": "L10",
+      "outcome": "not_run",
+      "version": "0.7.0"
+    },
+    {
+      "case": "L11",
+      "outcome": "blocked",
+      "version": "0.7.0"
+    },
+    {
+      "case": "L12",
+      "outcome": "passed",
+      "version": "0.7.0"
+    },
+    {
+      "case": "L13",
+      "outcome": "passed",
+      "version": "0.7.0"
+    },
+    {
+      "case": "L14",
+      "outcome": "not_run",
+      "version": "0.7.0"
+    },
+    {
+      "case": "L15",
+      "outcome": "passed",
+      "version": "0.7.0"
+    },
+    {
+      "case": "L16",
+      "outcome": "passed",
+      "version": "0.7.0"
+    },
+    {
+      "case": "L17",
+      "outcome": "blocked",
+      "version": "0.7.0"
+    },
+    {
+      "case": "L18",
+      "outcome": "passed",
+      "version": "0.7.0"
+    }
+  ]
+}

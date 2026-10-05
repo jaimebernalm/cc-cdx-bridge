@@ -1,13 +1,13 @@
 # Piloto 0.7.0: uso y recuperación
 
-Candidata local en `feature/phase-5-pilot-hardening`, sin publicación remota. Plan y evidencia: [FASE_5.md](FASE_5.md).
+Candidata local en `feature/phase-5-pilot-hardening`, sin release ni fusión; rama publicada para CI. Plan y evidencia: [FASE_5.md](FASE_5.md) y [PILOT_EVIDENCE.json](PILOT_EVIDENCE.json). El reinicio completo de apps y varios ensayos nativos siguen pendientes.
 
 ## Cambios
 
 - Las órdenes nuevas guardan estado de wake y dueño de forma atómica. Órdenes antiguas huérfanas se señalan sin replay; la inspección conserva separado el error original.
 - El panel reconcilia notificaciones con ACK perdido consultando su `clientId` exacto y proyecto nativo; no las reenvía. Consumir la notificación no prueba que la orden se aplicó.
 - El diagnóstico distingue política explícita, autorización por carpeta y versión/capacidades del receptor vivo. Actualizar archivos no sustituye procesos ya abiertos.
-- La UI muestra la versión del servicio conectado. Una entrega incierta aparece como incidencia sin indicador de trabajo infinito.
+- La UI mantiene accesibles los objetivos largos sin desplazar todo el resultado, y distingue cierre sin resultado de una espera activa. Muestra la versión del servicio conectado. Una entrega incierta aparece como incidencia sin indicador de trabajo infinito.
 - Verificador con CLI real: actualización desde 0.6.1, hashes, PATH reducido, desinstalación y reinstalación conservando bases privadas.
 - Regresiones de reinicios, credenciales antiguas, alias iguales, espacios/Unicode y worktrees.
 - Resúmenes compartibles por lista permitida; las exportaciones completas siguen privadas.
@@ -19,7 +19,7 @@ Candidata local en `feature/phase-5-pilot-hardening`, sin publicación remota. P
 | Bun | 1.4.2; launcher con PATH reducido | Otros runtimes no se presuponen |
 | Codex Desktop | IPC con `supportsUntrustedAppInput`, stream 11 | Contrato interno; otra versión de stream se bloquea |
 | Claude Desktop Code | Protocolo de pares 1; motor 2.1.286 observado | Actualizar CLI no actualiza el motor Desktop; CLI/VS Code no sustituyen al chat elegido |
-| Plataforma | macOS local; Linux CI de fase 4 | La suite nueva necesita CI Linux antes de anunciar nueva validación allí; Windows no implementado |
+| Plataforma | macOS local; Linux y macOS en CI de fase 5 | Las pruebas de IPC en CI usan fixtures; no ejecutan las apps Desktop. Windows no implementado |
 | Recepción | Política explícita y autorización por carpeta exacta | Otro worktree no hereda; no libera mensajes antiguos ni concede ejecución/edición |
 | Modelo | Respuesta correlacionada y evaluación de versión/hash | No certifica verdad, independencia intelectual ni consenso |
 | Progreso | Turnos nativos y órdenes humanas durables | No hay supervisor que invente tareas en segundo plano |
