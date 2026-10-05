@@ -286,6 +286,8 @@ test("edits, additions and deletions integrate without changing index, HEAD or s
     x.close();
   }
 });
+// Multiple fresh captures and private-index previews spawn real Git processes;
+// hosted macOS runners need more than Bun's default 5 s for this whole scenario.
 test("checks and exact other-agent review gate readiness; disk changes, failed checks and stale reviews revoke it", async () => {
   const x = await fixture();
   try {
@@ -352,7 +354,7 @@ test("checks and exact other-agent review gate readiness; disk changes, failed c
   } finally {
     x.close();
   }
-});
+}, 20000);
 test("untracked contents and context invalidate candidates; old receipts cannot be relabeled", async () => {
   const x = await fixture();
   try {

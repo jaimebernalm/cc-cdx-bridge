@@ -93,6 +93,7 @@ Logs/transcriptos bajo `.local/phase6/`, fuera de Git. No copiar tokens, IDs pri
 - La primera prueba visual recorrió preflight → create → capture → recibo declarado → revisión sintética por IPC → inspección → descarga. Git y núcleo reales; ambas identidades/modelos de ese ensayo son fixtures. Captura privada `.local/phase6/ui-integration.png`; parche descargado solo en el ámbito de prueba. El ensayo nativo posterior se distingue a continuación.
 - 151 pruebas / 1195 aserciones por suite fuente y bundle aprobadas, incluidos 15 casos nuevos de fase 6. Tipos backend/UI y build aprobados. El test antiguo que contaba herramientas se actualizó de 13 a 15 por las dos herramientas nuevas.
 - Instalación CLI **aislada**: siete comprobaciones aprobadas, actualización real 0.6.1 → 0.8.0, hashes de archivos/guía/UI, conservación de historial/órdenes/autorización al actualizar/desinstalar/reinstalar y launcher con PATH reducido. No usa auth real, cambia settings de Claude ni crea sesiones de modelos. Log privado `.local/phase6/installation.log`.
+- La primera CI de la PR aprobó Linux completo y detectó un timeout de 5 segundos en macOS para el escenario de readiness con varias capturas y previews Git reales. Se acotó ese test a 20 segundos, igual que los otros ensayos Git/IPC largos, sin cambiar aserciones ni límites del producto; se exige una nueva CI del commit corregido.
 
 ## Piloto nativo de escritura — 5 de octubre de 2026
 
