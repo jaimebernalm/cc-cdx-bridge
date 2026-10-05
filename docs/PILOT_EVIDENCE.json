@@ -72,7 +72,7 @@
     },
     {
       "check": "native_app_restart",
-      "passed": false
+      "passed": true
     }
   ],
   "realCases": [
@@ -93,7 +93,7 @@
     },
     {
       "case": "L04",
-      "outcome": "not_run",
+      "outcome": "passed",
       "version": "0.7.0"
     },
     {
@@ -118,7 +118,7 @@
     },
     {
       "case": "L09",
-      "outcome": "not_run",
+      "outcome": "passed",
       "version": "0.7.0"
     },
     {
@@ -128,7 +128,7 @@
     },
     {
       "case": "L11",
-      "outcome": "blocked",
+      "outcome": "passed",
       "version": "0.7.0"
     },
     {
@@ -143,7 +143,7 @@
     },
     {
       "case": "L14",
-      "outcome": "not_run",
+      "outcome": "passed",
       "version": "0.7.0"
     },
     {

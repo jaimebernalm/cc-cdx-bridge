@@ -1,13 +1,13 @@
 # Piloto 0.7.0: uso y recuperación
 
-Candidata local en `feature/phase-5-pilot-hardening`, sin release ni fusión; rama publicada para CI. Plan y evidencia: [FASE_5.md](FASE_5.md) y [PILOT_EVIDENCE.json](PILOT_EVIDENCE.json). El reinicio completo de apps y varios ensayos nativos siguen pendientes.
+Candidata local en `feature/phase-5-pilot-hardening`, sin release ni fusión; rama publicada para CI. Plan y evidencia: [FASE_5.md](FASE_5.md) y [PILOT_EVIDENCE.json](PILOT_EVIDENCE.json). Reapertura completa de apps, pausa/contexto y continuación real verificadas con 0.7.0; los ensayos de chats nuevos y nombres iguales siguen pendientes de autorización explícita.
 
 ## Cambios
 
 - Las órdenes nuevas guardan estado de wake y dueño de forma atómica. Órdenes antiguas huérfanas se señalan sin replay; la inspección conserva separado el error original.
 - El panel reconcilia notificaciones con ACK perdido consultando su `clientId` exacto y proyecto nativo; no las reenvía. Consumir la notificación no prueba que la orden se aplicó.
 - El diagnóstico distingue política explícita, autorización por carpeta y versión/capacidades del receptor vivo. Actualizar archivos no sustituye procesos ya abiertos.
-- La UI mantiene accesibles los objetivos largos sin desplazar todo el resultado, y distingue cierre sin resultado de una espera activa. Muestra la versión del servicio conectado. Una entrega incierta aparece como incidencia sin indicador de trabajo infinito.
+- La UI mantiene accesibles los objetivos largos sin desplazar todo el resultado, y distingue cierre sin resultado de una espera activa. Muestra la versión del servicio conectado y actualiza el aviso de control hasta «Aplicada» al confirmar su orden. Una entrega incierta aparece como incidencia sin indicador de trabajo infinito.
 - Verificador con CLI real: actualización desde 0.6.1, hashes, PATH reducido, desinstalación y reinstalación conservando bases privadas.
 - Regresiones de reinicios, credenciales antiguas, alias iguales, espacios/Unicode y worktrees.
 - Resúmenes compartibles por lista permitida; las exportaciones completas siguen privadas.
