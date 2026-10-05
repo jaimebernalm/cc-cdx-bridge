@@ -1,7 +1,7 @@
 {
   "name": "claude-uds-bridge",
-  "version": "0.7.0",
-  "description": "Guide Codex Desktop and Claude Desktop Code collaboration with free, research and review routines, authored results and versioned assessments.",
+  "version": "0.8.0",
+  "description": "Coordinate Desktop agents with nine optional routines, exact-version reviews and scoped Git implementation candidates.",
   "author": {
     "name": "Jaime Bernal (fork of Leon Kohli)"
   },
@@ -9,8 +9,8 @@
   "homepage": "https://github.com/jaimebernalm/cc-cdx-bridge",
   "interface": {
     "displayName": "CC–CDX Bridge",
-    "shortDescription": "Collaborate, research and review with both agents.",
-    "longDescription": "Choose exact Desktop conversations, continue existing analyses or start new work, collaborate freely or use research/review guidance, record authored results and assessments of exact versions, preserve disagreements and export the exchange. Reception settings still apply. Optional structured coordination adds a current-run analysis barrier, context versions, pause and crash recovery. A local authenticated panel displays exchanges, results and disagreements and queues human controls for the selected Desktop chat.",
+    "shortDescription": "Plan, review and prepare changes with both agents.",
+    "longDescription": "Choose exact Desktop conversations, continue existing analyses or start new work, collaborate freely or use research/review guidance, record authored results and assessments of exact versions, preserve disagreements and export the exchange. Reception settings still apply. Optional structured coordination adds a current-run analysis barrier, context versions, pause and crash recovery. Opt-in implementation contracts pin a clean Git base, assign files or existing worktrees, capture immutable patches and record declared checks. Private-index integration detects conflicts without changing checkouts or publishing. A local authenticated panel displays exchanges, results and disagreements and queues human controls for the selected Desktop chat.",
     "developerName": "Jaime Bernal · based on Leon Kohli's bridge",
     "category": "Productivity",
     "capabilities": [

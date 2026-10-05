@@ -15,6 +15,7 @@ import { contextSchema, limitsSchema } from './runs';
 import { discoverParticipants } from './participants';
 import { coordinationSchema, controlSchema } from './coordination';
 import { routineSchema, normalizeRoutine, guide, taskSchema, reportSchema, closureSchema } from './routines';
+import {implementationSchema,implementationActionSchema} from './implementation';
 import { startPanel } from './panel';
 import { PanelCommands } from './panel-commands';
 import { inspectParticipant } from './participants';
@@ -58,7 +59,7 @@ const server = new McpServer({ name: 'claude-uds-bridge', version }, { instructi
   + 'Settle who owns which files before two agents edit one repository. This plugin holds no locks.\n'
   + 'For a registered collaboration, use collaboration_send and preserve the CC_CDX_RUN_V1 reply header. '
   + 'Preparing or starting a run sends no model task and grants no reception or execution permission. '
-  + 'Use bridge-collaboration for guided free/research/review work. Agent reports are declarations, not core-validated consensus. '
+  + 'Use bridge-collaboration for free collaboration or optional research, review, diagnosis, architecture, product, test-design, comparison and implementation guidance. Agent reports are declarations, not core-validated consensus. '
   + 'Optional structured coordination provides a current-run initial exchange barrier, versioned tasks, pause and explicit recovery; it does not erase previous chat history or generate intellectual tasks in the background.' });
 
 server.registerTool('session_start', { description: 'Bind the native SessionStart lifecycle hook and start the receiver.',
@@ -114,7 +115,7 @@ server.registerTool('collaboration_discover', { description:'List process-verifi
   });
 server.registerTool('collaboration_prepare', { description:'Prepare a supervised collaboration between this caller Codex chat and one exact Claude Desktop ID. Records context and verified repo/worktree/revision without sending messages or reserving conversations. Reuse requestId only for the identical preparation. Different revisions require revisionPolicy compare and a fixed comparisonBase. No permission or settings change.',
   inputSchema:{requestId:uuid,peerId:uuid,context:contextSchema,limits:limitsSchema.default({maxMessages:24,maxSeconds:1800}),
-    revisionPolicy:z.enum(['same','compare']).default('same'),comparisonBase:z.string().min(1).max(256).optional(),routine:routineSchema.optional(),coordination:coordinationSchema.optional()},annotations:{openWorldHint:false} },
+    revisionPolicy:z.enum(['same','compare']).default('same'),comparisonBase:z.string().min(1).max(256).optional(),routine:routineSchema.optional(),coordination:coordinationSchema.optional(),implementation:implementationSchema.optional()},annotations:{openWorldHint:false} },
   async (args,extra)=>result(await collaboration(extra._meta).prepare(args)));
 server.registerTool('collaboration_start', { description:'Revalidate and reserve both prepared conversations for one active collaboration. Sends no work. supervised must be true because effective Claude reception remains unknown; this is a mode choice, not approval to alter settings. Busy Claude requires waiting or an explicit allowBusyPeer choice.',
   inputSchema:{runId:uuid,supervised:z.literal(true),allowBusyPeer:z.boolean().default(false)},annotations:{openWorldHint:false} },
@@ -137,10 +138,12 @@ server.registerTool('collaboration_finish', {description:'Close the caller-owned
 server.registerTool('collaboration_export', {description:'Return the caller-owned private collaboration log as Markdown or JSON, with exact participant IDs and transport evidence. Does not write files or publish. Review personal content before sharing.',
   inputSchema:{runId:uuid,format:z.enum(['markdown','json']).default('markdown')},annotations:{readOnlyHint:true,openWorldHint:false} },
   async ({runId,format},extra)=>{const c=collaboration(extra._meta);return result({format,content:c.store.export(runId,c.owner,format)});});
-server.registerTool('collaboration_guide',{description:'Read guidance for optional free/research/review routines and per-agent new/existing starts. No tasks, reservations or history import. Supply explicit priorAnalysis for existing starts. Free is the default; guidance imposes no fixed rounds or independence guarantee.',
+server.registerTool('collaboration_guide',{description:'Read guidance for nine optional collaboration orientations and per-agent new/existing starts. No tasks, reservations or history import. Supply explicit priorAnalysis for existing starts. Free is the default; guidance imposes no fixed rounds or independence guarantee.',
   inputSchema:{routine:routineSchema.optional(),priorAnalysis:contextSchema.shape.priorAnalysis.optional()},annotations:{readOnlyHint:true,openWorldHint:false}},async({routine,priorAnalysis},extra)=>{
     callerThread(extra._meta);return result(guide(normalizeRoutine(routine,priorAnalysis??{})));
   });
+server.registerTool('collaboration_implementation',{description:'Capture immutable scoped Git candidates, record declared check receipts for the exact hash, or inspect integration. Requires an explicit implementation contract and active structured controller. Capture publishes an exact result for peer review. Never executes a test command, edits project files, commits or publishes. Idempotent operationId.',inputSchema:{runId:uuid,operationId:uuid,work:implementationActionSchema},annotations:{openWorldHint:false}},async({runId,operationId,work},extra)=>{const c=collaboration(extra._meta);return result(await c.store.implementationAction(runId,c.owner,operationId,work));});
+server.registerTool('collaboration_implementation_inspect',{description:'Recheck scoped workspaces, exact-candidate declared tests and other-agent review; prepare integration against the pinned base using a private index. Reports conflicts without changing the real index, checkout, HEAD or publishing. Ready means those checks passed, not verified test execution or consensus.',inputSchema:{runId:uuid},annotations:{readOnlyHint:true,openWorldHint:false}},async({runId},extra)=>{const c=collaboration(extra._meta);return result(await c.store.inspectImplementation(runId,c.owner));});
 server.registerTool('collaboration_report',{description:'Record this caller Codex agent’s response declaration, authored result/version or review of an exact version. Cannot impersonate Claude; Claude reports come from authorized structured responses; initial barrier content remains hidden until both analyses are recorded. Idempotent reportId; versions are immutable/sequential and reviews retain their target hash. Declared done/agree does not change core run state or certify consensus.',
   inputSchema:{runId:uuid,reportId:uuid,report:reportSchema,text:z.string().trim().min(1).max(32000)},annotations:{openWorldHint:false}},async({runId,reportId,report,text},extra)=>{
     const c=collaboration(extra._meta);return result(c.store.recordReport(runId,c.owner,reportId,report,text));

@@ -9,7 +9,7 @@ import { PanelCommands } from '../src/panel-commands';
 
 // Opt-in Codex CLI check. No real auth, trust decisions, model sessions or settings.
 const repository = resolve(import.meta.dir, '../../..');
-const output = join(repository, '.local', 'phase5', `installation-${randomUUID()}`);
+const output = join(repository, '.local', version==='0.8.0'?'phase6':'phase5', `installation-${randomUUID()}`);
 const codexHome = join(output, 'codex home');
 const marketplacePath=join(output,'marketplace with spaces');
 mkdirSync(codexHome, { recursive: true, mode: 0o700 });
@@ -57,7 +57,7 @@ try {
   retained();checks.push({check:'update_preserves_private_state',passed:true,from:old.version,version:installed.version});
   const listing = await cli(['plugin', 'list', '--marketplace', 'jaimebernalm', '--json']);
   if (!listing.installed?.some((item: { pluginId: string; enabled: boolean }) => item.pluginId === installed.pluginId && item.enabled)) throw new Error('Installed plugin not enabled');
-  for (const file of ['dist/server.js', 'dist/hook.js', 'dist/cli.js', 'scripts/run-bun.sh', '.mcp.json', 'hooks/hooks.json', '.codex-plugin/plugin.json', 'skills/bridge-collaboration/SKILL.md', 'skills/bridge-collaboration/references/api.md', 'skills/bridge-collaboration/references/structured.md', 'skills/bridge-collaboration/references/panel.md', 'panel-dist/index.html', ...readdirSync(join(target,'panel-dist/assets')).map(f=>'panel-dist/assets/'+f)]) {
+  for (const file of ['dist/server.js', 'dist/hook.js', 'dist/cli.js', 'scripts/run-bun.sh', '.mcp.json', 'hooks/hooks.json', '.codex-plugin/plugin.json', 'skills/bridge-collaboration/SKILL.md', 'skills/bridge-collaboration/references/api.md', 'skills/bridge-collaboration/references/structured.md', 'skills/bridge-collaboration/references/panel.md', 'skills/bridge-collaboration/references/implementation.md', 'panel-dist/index.html', ...readdirSync(join(target,'panel-dist/assets')).map(f=>'panel-dist/assets/'+f)]) {
     if (digest(join(installed.installedPath, file)) !== digest(join(target, file))) throw new Error(`Cached file differs: ${file}`);
   }
   checks.push({ check: 'installed_files_match_checkout', passed: true });

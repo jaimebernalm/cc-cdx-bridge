@@ -2,11 +2,11 @@ import { z } from 'zod';
 import { uuid } from './claude';
 
 export const routineSchema = z.object({
-  mode: z.enum(['free', 'research', 'review']).default('free'),
+  mode: z.enum(['free', 'research', 'review', 'diagnose', 'architecture', 'product', 'test_design', 'compare', 'implement']).default('free'),
   starts: z.object({ codex: z.enum(['new', 'existing']), claude: z.enum(['new', 'existing']) }).strict().optional(),
 }).strict();
 export type RoutineInput = z.input<typeof routineSchema>;
-export type Routine = { mode: 'free' | 'research' | 'review'; starts: { codex: 'new' | 'existing'; claude: 'new' | 'existing' }; startMode: 'new' | 'existing' | 'mixed'; independence: 'not_guaranteed' };
+export type Routine = { mode: z.infer<typeof routineSchema>['mode']; starts: { codex: 'new' | 'existing'; claude: 'new' | 'existing' }; startMode: 'new' | 'existing' | 'mixed'; independence: 'not_guaranteed' };
 export function normalizeRoutine(input: RoutineInput | undefined, prior: {codex?: string; claude?: string}): Routine {
   const parsed = routineSchema.parse(input ?? {});
   const starts = parsed.starts ?? { codex: prior.codex?.trim() ? 'existing' : 'new', claude: prior.claude?.trim() ? 'existing' : 'new' };
@@ -46,10 +46,27 @@ export function parseWork(text: string): { work: ({kind:'task'} & Task) | Report
   return {work, text: body};
 }
 
+export const routineCatalog = [
+ {id:'free',title:'Colaboración libre',description:'Adaptad el intercambio al objetivo.'},
+ {id:'research',title:'Investigación',description:'Contrastad evidencia y alternativas.'},
+ {id:'review',title:'Revisión cruzada',description:'Buscad defectos y comprobad propuestas.'},
+ {id:'diagnose',title:'Diagnóstico',description:'Contrastad hipótesis y causas del fallo.'},
+ {id:'architecture',title:'Arquitectura',description:'Evaluad estructura, límites y decisiones.'},
+ {id:'product',title:'Producto',description:'Explorad necesidades y opciones útiles.'},
+ {id:'test_design',title:'Diseño de pruebas',description:'Elegid casos que detecten fallos reales.'},
+ {id:'compare',title:'Comparación',description:'Comparad alternativas con criterios explícitos.'},
+ {id:'implement',title:'Implementación',description:'Planificad y preparad cambios con alcance definido.'},
+] as const;
 export const routineGuides = {
   free: 'Colaboración libre: adapta análisis, preguntas, propuestas y críticas al objetivo. No hay rondas obligatorias ni roles intelectuales fijos. Conserva desacuerdos útiles.',
   research: 'Investigación: contrasta explicaciones y alternativas con evidencia verificable, distingue hechos de hipótesis y conserva incertidumbres. Elige las comprobaciones que resuelvan las preguntas abiertas.',
   review: 'Revisión: examina el material contra el objetivo y restricciones; identifica problemas concretos, impacto y comprobaciones. Puedes cuestionar el enfoque completo. No fuerces acuerdo ni cambios de archivos.',
+  diagnose:'Diagnóstico: formula hipótesis rivales, busca pruebas que las distingan y verifica la causa. Separa observaciones, inferencias y pruebas no ejecutadas.',
+  architecture:'Arquitectura: inspecciona requisitos y restricciones reales, contrasta estructuras, costes y riesgos de migración; registra decisiones y cuestiones abiertas.',
+  product:'Producto: identifica quién tiene el problema, compara soluciones y define criterios observables de éxito. No inventes validación con usuarios ni compromisos de negocio.',
+  test_design:'Diseño de pruebas: identifica comportamientos importantes y fallos plausibles, prioriza pruebas que puedan refutar la implementación y distingue casos diseñados de ejecutados.',
+  compare:'Comparación: explicita criterios, evidencia y tradeoffs. Contrasta alternativas bajo las mismas condiciones y conserva incertidumbres; no fuerces un ganador.',
+  implement:'Implementación: acuerda reparto y base, prepara cambios, comprueba y revisa la versión exacta. Sin contrato de implementación solo se planifica; ningún preset concede permisos. No publiques, fusiones ni despliegues por inferencia.',
 };
 export function guide(routine: Routine) {
   return { ...routine, guidance: routineGuides[routine.mode], initial: {

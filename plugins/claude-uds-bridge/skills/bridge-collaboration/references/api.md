@@ -57,3 +57,7 @@ When a process/project revision changes, close/cancel and prepare again; don't f
 ## Phase 4 panel
 
 `collaboration_panel {}` returns a private authenticated loopback URL for the caller-owned panel. `collaboration_panel_command {commandId}` reads/applies only that persisted human action using real caller metadata. See [panel.md](panel.md) for notification handling, lease/idempotency and reload limitations. No arbitrary ownerThread is accepted by either MCP operation.
+
+## Phase 6 implementation
+
+Prepare accepts optional `implementation` with structured coordination. `collaboration_implementation {runId, operationId, work}` captures a candidate, records a declared check receipt or inspects integration, subject to active state/controller fencing. `collaboration_implementation_inspect {runId}` recomputes readiness read-only, including after closure. See [implementation.md](implementation.md) for exact shapes, limits and workflow. The routine catalog now also includes diagnose, architecture, product, test_design, compare and implement. Ordinary runs retain frozen-diff checks; only registered implementation roots may vary their scoped worktree content.

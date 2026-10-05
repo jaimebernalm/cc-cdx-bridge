@@ -175,3 +175,7 @@ El chat Codex temporal ya está archivado tras completar la prueba y quedar inac
 CI del arreglo `0b440699f2bd85ef9da6f9cdb1cb3b9d186554f9`: [37265302282](https://github.com/jaimebernalm/cc-cdx-bridge/actions/runs/37265302282), fuente y bundles aprobados en Linux y macOS; comprobación de bundle contra fuente aprobada en Linux. Suites locales: 136/0 y 1051 aserciones por suite. La rama sigue publicada, sin PR/fusión/release de fase 5.
 
 La matriz actual contiene 17 casos nativos pasados en 0.7.0. L08 de retención/denegación se conserva como evidencia nativa histórica de fase 4 y regresión automatizada actual; no se presenta como ensayo nativo nuevo de 0.7.0. El rechazo del sobre inválido en 705 aporta un negativo adicional, pero no sustituye un ensayo de políticas hold/refuse con un sobre válido. Implementación y ensayos autorizados de fase 5 verificados; el cierre administrativo sigue pendiente de limpiar Claude.
+
+## Entrega autorizada — 5 de octubre de 2026
+
+Tras autorización del usuario, fase 5 se integró en `main` mediante [PR #6](https://github.com/jaimebernalm/cc-cdx-bridge/pull/6), conservando sus commits. Se revisó el diff y la CI del head exacto `d8cad65` estaba aprobada en Linux y macOS. La nota anterior de ausencia de autorización/PR describe el estado histórico del piloto. El Claude temporal permanece inactivo con archivado pendiente; no hay que repetir ensayos, cambiar permisos ni eliminar evidencia para esa limpieza.
