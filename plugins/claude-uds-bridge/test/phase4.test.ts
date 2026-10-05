@@ -20,6 +20,7 @@ test('panel guards tokens, Origin, CSRF, paths and preserves existing private ru
  expect((await fetch(x.p.origin+'/api/v1/session',{method:'POST',headers:{Origin:x.p.origin},body:JSON.stringify({token:'invalid'})})).status).toBe(401);
  expect((await fetch(x.p.origin+'/src/panel.ts')).status).toBe(404);
  expect((await fetch(x.p.origin+'/')).headers.get('Content-Security-Policy')).toContain("frame-ancestors 'none'");
+ const oldToken=new URL(x.p.url).hash.slice(7),freshToken=new URL(x.p.reopenUrl()).hash.slice(7);expect(freshToken).not.toBe(oldToken);expect((await x.call('health')).status).toBe(200);const exchange=(token:string)=>fetch(x.p.origin+'/api/v1/session',{method:'POST',headers:{Origin:x.p.origin},body:JSON.stringify({token})});expect((await exchange(oldToken)).status).toBe(401);expect((await exchange(freshToken)).status).toBe(200);expect((await exchange(freshToken)).status).toBe(401);
  expect((await x.call('participants')).status).toBe(200);expect(await (await x.call('runs')).json()).toEqual([]);
  const huge='x'.repeat(262145);expect((await fetch(x.p.origin+'/api/v1/commands',{method:'POST',headers:{Cookie:x.cookie,Origin:x.p.origin,'X-CSRF-Token':x.csrf},body:huge})).status).toBe(409);
  }finally{await x.close();}});
@@ -69,8 +70,8 @@ test('interrupted applications are visible but not replayable; a live worker is 
 
 test('MCP panel opening is bound to the real caller and does not start model work',async()=>{const f=await nativeFixture();const c=await f.connect();try{
  const opened=await f.call(c,'collaboration_panel',{});expect(opened.error).toBeFalsy();const url=new URL(opened.data.url);expect(url.hostname).toBe('127.0.0.1');
- const auth=await fetch(url.origin+'/api/v1/session',{method:'POST',headers:{Origin:url.origin},body:JSON.stringify({token:url.hash.slice(7)})});expect(auth.status).toBe(200);const cookie=auth.headers.get('set-cookie')!.split(';')[0]!;const health=await fetch(url.origin+'/api/v1/health',{headers:{Cookie:cookie}});expect((await health.json() as {ownerThread:string}).ownerThread).toBe(f.desktop.threadId);expect(f.desktop.submissions).toHaveLength(0);
- expect((await f.call(c,'collaboration_panel',{})).data.url).toBe(opened.data.url);
+ expect(url.hash).not.toContain('token');expect(JSON.stringify(opened.data)).not.toMatch(/token=[a-f0-9]+/);expect(opened.data.actor).toBe('panel_session');expect(f.desktop.submissions).toHaveLength(0);
+ const denied=await fetch(url.origin+'/api/v1/health');expect(denied.status).toBe(401);
  }finally{await c.close();await f.close();}});
 
 test('two local panels use separate cookie names and survive parallel browser sessions',async()=>{const x=await fixture();const other=startPanel({configDir:x.f.config,stateDir:x.f.state,codexHome:x.f.root,pluginRoot:root,ipcPath:x.f.desktop.path});try{

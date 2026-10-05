@@ -3,6 +3,7 @@ import { homedir } from 'node:os';
 import { parseArgs } from 'node:util';
 import { doctor } from './doctor';
 import { activateReceiver } from './activation';
+import {PanelOpening} from './panel-opening';
 import { startPanel } from './panel';
 
 try {
@@ -22,7 +23,7 @@ try {
     const threadId = values.thread ?? process.env.CODEX_THREAD_ID;
     if(command==='panel'){
       const panel=startPanel({configDir,stateDir,codexHome,pluginRoot,ipcPath:join(codexHome,'ipc','ipc.sock'),ownerThread:values.thread});
-      console.log(JSON.stringify({url:panel.url,scope:values.thread?'selected_chat':'local_chats',settingsModified:false}));
+      const browser=await new PanelOpening().open('cli-panel',panel.url,true);console.log(JSON.stringify({url:panel.origin+'/',browser,tokenReturned:false,scope:values.thread?'selected_chat':'local_chats',settingsModified:false}));
       for(const signal of ['SIGINT','SIGTERM'] as const)process.once(signal,()=>{void panel.close().then(()=>process.exit(0));});
     }else if (command === 'doctor') {
       const report = await doctor({ project, threadId, peerId: values.peer, configDir, codexHome, pluginRoot });

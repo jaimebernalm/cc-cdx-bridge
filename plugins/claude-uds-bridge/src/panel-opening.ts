@@ -6,9 +6,9 @@ import { spawn } from 'node:child_process';
 export class PanelOpening {
   private opened = new Map<string, Promise<{requested: boolean; error?: string}>>();
   constructor(private launch = launchLocalBrowser) {}
-  open(key: string, url: string, enabled = true) {
+  open(key: string, url: string, enabled = true, force = false) {
     if (!enabled || process.env.CC_CDX_PANEL_AUTO_OPEN === '0') return Promise.resolve({requested: false});
-    const previous = this.opened.get(key); if (previous) return previous;
+    const previous = this.opened.get(key); if (previous && !force) return previous;
     const pending = this.launch(url).then(() => ({requested: true}), () => ({requested: false, error: 'No se pudo abrir el navegador. Abre el enlace privado del panel.'}));
     this.opened.set(key, pending); return pending;
   }

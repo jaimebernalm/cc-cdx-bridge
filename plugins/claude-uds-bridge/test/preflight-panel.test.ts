@@ -67,6 +67,7 @@ test('panel launch dispatch is once per action; failure retains a usable deep li
  const launches:string[]=[];const opening=new PanelOpening(async url=>{launches.push(url)});const url=panelLink('http://127.0.0.1:1234/#token=private',{runId:randomUUID()});
  await Promise.all([opening.open('start',url),opening.open('start',url)]);expect(launches).toHaveLength(1);expect(new URL(url).hash).toContain('run=');expect(new URL(url).hash).toContain('token=private');
  expect(await opening.open('no-open',url,false)).toEqual({requested:false});expect(launches).toHaveLength(1);
+ await opening.open('start',url,true,true);expect(launches).toHaveLength(2);
  const failed=new PanelOpening(async()=>{throw new Error('No browser')});expect((await failed.open('start',url)).requested).toBe(false);
 });
 test('refresh publishes the current detail even when another section is slow or fails',async()=>{
