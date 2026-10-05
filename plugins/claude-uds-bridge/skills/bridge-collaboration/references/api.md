@@ -4,6 +4,8 @@ All controls are bound to the current Codex caller. Use the plugin MCP tools; no
 
 ## Prepare and send
 
+`collaboration_preflight`: `{peerId}` returns `readyForCheck`, the exact Codex policy, project authorization and receiver support. It sends no messages and never changes settings. Effective Claude reception remains unknown. A blocked check includes a private authorization panel link.
+
 `collaboration_prepare` accepts:
 
 ```json
@@ -18,7 +20,9 @@ All controls are bound to the current Codex caller. Use the plugin MCP tools; no
 
 `routine` is optional: mode defaults to `free`; starts infer existing only from nonempty explicit priorAnalysis. Explicit existing requires text; explicit new rejects conflicting prior text. Do not include both earlier analyses for a declared new/new start. For different worktrees/revisions, `revisionPolicy:"compare"` needs a fixed local `comparisonBase`; default `same` requires matching tracked state.
 
-`collaboration_start`: `{runId, supervised:true}`. Busy Claude requires explicit `allowBusyPeer:true` choice; otherwise wait.
+`collaboration_start`: `{runId, supervised:true, openPanel?:boolean}`. Prepare also accepts `openPanel` (default true). Both return a private deep link, and start rechecks reception before reserving participants. Sends also recheck reception before consuming budget. A missing usable grant with default reception stops the run at prepared; it does not send a task. Explicit accept works without inheritance. An opening result `requested:true` reports browser dispatch, not a viewed page or confirmed reception.
+
+ Busy Claude requires explicit `allowBusyPeer:true` choice; otherwise wait.
 
 `collaboration_send`: `{runId,messageId,text,replyTo?,task?}`. A task is `{taskId,intent:"analyze"|"discuss"|"synthesize"|"review",target?:{resultId,version}}`. Review requires target. The server includes the exact draft and hash. Repeating a message ID must preserve text, replyTo and task; it never resends. `replyTo` for outgoing must identify a delivered incoming message in this run.
 

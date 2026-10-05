@@ -11,6 +11,7 @@ import { readDesktopInputSnapshot, deliverToDesktop } from './desktop';
 import { doctor } from './doctor';
 import {normalizeImplementation} from './implementation';
 import { version } from './version';
+import { receptionPreflight, requireReception, PreflightBlocked } from './preflight';
 import { ProjectAuthorizations, authorizationIdentitySchema, authorizationChangeSchema } from './project-authorization';
 import { processStart } from './claude';
 import { normalizeRoutine, routineGuides, routineCatalog } from './routines';
@@ -45,6 +46,7 @@ export function startPanel(options:Options){
       await compareProjects(codex.project,claude.project,input.command.revisionPolicy,input.command.comparisonBase);
       if(claude.status!=='idle'&&!input.command.allowBusyPeer)throw new Error('Claude is busy; wait or choose the explicit busy option');
       if(input.command.continuedFrom)store.assertOwner(input.command.continuedFrom,input.ownerThread);
+      requireReception(await receptionPreflight(options,input.ownerThread,input.command.peerId,[codex,claude]));
     }else{
       const run=store.status(input.command.runId,input.ownerThread);
       if(run.coordination?.revision!==input.command.expectedRevision)throw new Error('Control revision changed; refresh the collaboration');
@@ -133,7 +135,7 @@ export function startPanel(options:Options){
           if(url.pathname==='/api/v1/presets'&&req.method==='GET')return json(routineCatalog.map(p=>({...p,guidance:routineGuides[p.id]})));
           if(url.pathname==='/api/v1/runs'&&req.method==='GET')return json(list());
           if(url.pathname==='/api/v1/commands'&&req.method==='GET')return json(await inspectCommands());
-          if(url.pathname==='/api/v1/preflight'&&req.method==='POST'){const input=panelRequestSchema.parse(await body(req));await identity(input);return json({ready:true});}
+          if(url.pathname==='/api/v1/preflight'&&req.method==='POST'){const input=panelRequestSchema.parse(await body(req));await identity(input);return json({ready:true,roundTripVerified:false,message:'Requisitos comprobados. El agente debe verificar una respuesta correlacionada antes de analizar.'});}
           if(url.pathname==='/api/v1/commands'&&req.method==='POST'){
             const input=panelRequestSchema.parse(await body(req));
             if(options.ownerThread&&input.ownerThread!==options.ownerThread)throw new Error('Wrong conversation for this panel');
@@ -159,7 +161,7 @@ export function startPanel(options:Options){
               return new Response(inspection.integration.patch,{headers:{...headers,'Content-Type':'text/x-diff; charset=utf-8','Content-Disposition':`attachment; filename="implementation-${id}.patch"`}});
             }
             if(match[2]==='export'){const format=z.enum(['markdown','json']).parse(url.searchParams.get('format')??'markdown');return new Response(store.export(id,owner,format),{headers:{...headers,'Content-Type':format==='json'?'application/json':'text/markdown; charset=utf-8','Content-Disposition':`attachment; filename="collaboration-${id}.${format==='json'?'json':'md'}"`}});}
-            const after=z.coerce.number().int().min(0).parse(url.searchParams.get('after')??req.headers.get('last-event-id')??0);
+            const after=z.coerce.number().int().min(0).parse(req.headers.get('last-event-id')??url.searchParams.get('after')??0);
             if(match[2]==='events')return json({events:run.events.filter(e=>e.sequence>after).slice(0,100),cursor:run.events.filter(e=>e.sequence>after).slice(0,100).at(-1)?.sequence??after});
             let stop=()=>{};const stream=new ReadableStream<Uint8Array>({start(controller){let cursor=after;
               const send=()=>{try{const current=store.status(id,owner);for(const e of current.events.filter(e=>e.sequence>cursor)){controller.enqueue(new TextEncoder().encode(`id: ${e.sequence}\nevent: update\ndata: ${JSON.stringify(e)}\n\n`));cursor=e.sequence;}controller.enqueue(new TextEncoder().encode(': heartbeat\n\n'));}catch{stop();try{controller.close();}catch{}}};
@@ -173,7 +175,7 @@ export function startPanel(options:Options){
         if(relative!=='index.html'&&!/^assets\/[\w.-]+\.(js|css|woff2)$/.test(relative))return json({error:'Unknown asset'},404);
         const file=join(assetRoot,relative);if(!existsSync(file))return json({error:'Panel assets missing; build the UI'},503);
         return new Response(Bun.file(file),{headers:{...headers,'Cache-Control':extname(file)==='.html'?'no-store':'public, max-age=31536000, immutable'}});
-      }catch(error){return json({error:error instanceof Error?error.message:'Panel request failed'},409);}
+      }catch(error){return json({error:error instanceof Error?error.message:'Panel request failed',...(error instanceof PreflightBlocked?{preflight:error.preflight}:{})},409);}
     }});
   return {url:`http://127.0.0.1:${server.port}/#token=${token}`,origin:`http://127.0.0.1:${server.port}`,store,commands,
     async reconcileCommand(id:string){const command=commands.get(id);if(command)await reconcile([command]);},

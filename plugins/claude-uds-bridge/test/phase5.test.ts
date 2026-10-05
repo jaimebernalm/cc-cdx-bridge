@@ -19,12 +19,12 @@ async function authenticate(panel:ReturnType<typeof startPanel>){
 function request(f:Awaited<ReturnType<typeof nativeFixture>>){return {commandId:randomUUID(),ownerThread:f.desktop.threadId,project:f.root,command:{action:'create',peerId:f.peerId,context:{objective:'Restart regression',constraints:['Read only'],references:[],priorAnalysis:{}},limits:{maxMessages:4,maxSeconds:300},routine:{mode:'free'},coordination:{initialBarrier:false},revisionPolicy:'same'}};}
 
 test('panel restart keeps actions and project grants; stale credentials fail and consumed unknown wakes reconcile via API without replay',async()=>{
- const f=await nativeFixture(true);const options={configDir:f.config,stateDir:f.state,codexHome:f.root,pluginRoot,ipcPath:f.desktop.path};let panel=startPanel(options);
+ const f=await nativeFixture(true,{reception:'default'});const options={configDir:f.config,stateDir:f.state,codexHome:f.root,pluginRoot,ipcPath:f.desktop.path};let panel=startPanel(options);
  try{
+  const grants=new ProjectAuthorizations(f.state);grants.change({project:f.root,ownerThread:f.desktop.threadId,actionId:randomUUID(),enabled:true,expectedRevision:0,confirmed:true});grants.close();
   const auth=await authenticate(panel),data=request(f);expect((await auth.call('commands',data)).status).toBe(202);
   await until(()=>panel.commands.get(data.commandId)?.state==='unknown');expect(f.desktop.submissions).toHaveLength(1);
   const input=panel.commands.get(data.commandId)!.input_id;
-  const grants=new ProjectAuthorizations(f.state);grants.change({project:f.root,ownerThread:f.desktop.threadId,actionId:randomUUID(),enabled:true,expectedRevision:0,confirmed:true});grants.close();
   const oldPort=new URL(panel.origin).port;await panel.close();panel=startPanel({...options,port:Number(oldPort)});
   expect((await fetch(panel.origin+'/api/v1/commands',{headers:{Cookie:auth.cookie}})).status).toBe(401);
   const connected=await authenticate(panel);
@@ -38,7 +38,7 @@ test('panel restart keeps actions and project grants; stale credentials fail and
 },15000);
 
 test('diagnosis observes inherited reception and live distribution without creating state or changing policies',async()=>{
- const f=await nativeFixture();try{
+ const f=await nativeFixture(false,{reception:'default'});try{
   const options={configDir:f.config,project:f.root,threadId:f.desktop.threadId,peerId:f.peerId,codexHome:f.root,pluginRoot};
   const missing=join(f.root,'not-created');expect(observeProjectAuthorization(missing,f.root).enabled).toBe(false);expect(existsSync(missing)).toBe(false);
   const before=readFileSync(join(f.state,'project-authorizations.sqlite'));
@@ -87,7 +87,7 @@ test('shareable pilot evidence projects only allowlisted facts and refuses free 
 });
 
 test('new wakes persist their owner atomically; crashed and legacy queued commands become visible without replay',async()=>{
- const f=await nativeFixture();const panel=startPanel({configDir:f.config,stateDir:f.state,codexHome:f.root,pluginRoot,ipcPath:f.desktop.path});
+ const f=await nativeFixture(false,{reception:'default'});const panel=startPanel({configDir:f.config,stateDir:f.state,codexHome:f.root,pluginRoot,ipcPath:f.desktop.path});
  try{
   const {processStart}=await import('../src/claude');const {panelRequestSchema}=await import('../src/panel-commands');
   const atomicInput=panelRequestSchema.parse(request(f)),legacyInput=panelRequestSchema.parse(request(f));const atomic=panel.commands.enqueue(atomicInput,await processStart(process.pid));expect(atomic.command.state).toBe('waking');expect(atomic.command.processor_pid).toBe(process.pid);expect(atomic.command.processor_start).toBeTruthy();
@@ -101,7 +101,7 @@ test('new wakes persist their owner atomically; crashed and legacy queued comman
 });
 
 test('exact consumption in a changed project is rejected and native history failures remain visible',async()=>{
- const f=await nativeFixture();const panel=startPanel({configDir:f.config,stateDir:f.state,codexHome:f.root,pluginRoot,ipcPath:f.desktop.path});
+ const f=await nativeFixture(false,{reception:'default'});const panel=startPanel({configDir:f.config,stateDir:f.state,codexHome:f.root,pluginRoot,ipcPath:f.desktop.path});
  try{
   const {panelRequestSchema}=await import('../src/panel-commands');const queued=panel.commands.enqueue(panelRequestSchema.parse(request(f))).command;
   const db=new Database(join(f.state,'panel.sqlite'));db.run("UPDATE panel_commands SET state='unknown' WHERE id=?",[queued.id]);db.close();

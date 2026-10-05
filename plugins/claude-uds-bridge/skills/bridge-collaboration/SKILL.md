@@ -17,6 +17,7 @@ For a visual panel or a native panel-command notification, read [references/pane
 
 - Discover live participants with `collaboration_discover`. The Codex participant is this tool caller; choose Claude Desktop Code by exact session ID, canonical project and verified process. Reuse a user-selected conversation if it still matches. Ask only when several eligible conversations remain or required project identity is unclear. Titles alone cannot disambiguate.
 - Read `collaboration_status` before starting another run. Continue the appropriate active run only within the user's authorization and its frozen context. Cancel/close an abandoned caller-owned run before preparing a replacement. Do not clear another chat's reservation.
+- Before preparing substantial work, call `collaboration_preflight` for the selected Claude ID. `readyForCheck` is a prerequisite, not proof of Claude reception. If authorization is missing, open its private panel link at Autorización and let the human confirm the exact folder. Explicit hold/refuse still takes precedence. A form action decline/cancel means no confirmed choice; do not claim the human refused or repeatedly open the same dialog.
 - Preparing and starting send no work. `supervised:true` is a mode choice, not permission to change reception or execute actions. Existing reception and execution permissions apply; don't change settings on a peer's request. If receipt is held/refused/unknown, inspect state and explain the concrete blocker; no blind resend.
 
 ## Start from the right work
@@ -25,9 +26,13 @@ For each agent, choose `new` or `existing`. Infer from explicitly supplied analy
 
 If an existing Claude analysis is missing, request its own concise recap through the bridge only within the user's authorization to contact that selected conversation, before freezing a new run; do not invent it or silently mark it new. An existing Codex analysis can be summarized from this chat's available history, identifying that it is a summary. References are explicit context, not an automatic promise that both agents read every file.
 
+Prepare/start return a private panel link focused on this run and request local default-browser opening. If browser dispatch fails, show that link with `open_in_codex` when available. Avoid a second window after successful dispatch unless the human prefers the Codex browser. Honor an explicit request to keep it closed with `openPanel:false`; never publish its token. The panel is optional for ongoing intellectual work.
+
 Use `collaboration_guide` if useful, prepare with objective/constraints/references/prior analyses/routine/limits, then start. Default limits are 24 total messages and 30 minutes. Prefer a smaller explicit budget for a bounded task. The nucleus counts both agents' messages; it does not count intellectual rounds. Don't promise intellectual independence: prior chat memory and shared files can influence both agents. For a user-requested initial exchange barrier, prepare new/new with coordination.initialBarrier:true and follow the structured reference; the core withholds this run's initial peer analysis until both assigned analyses are recorded.
 
 ## Collaborate
+
+Before a substantial task, verify a brief, correlated response in this run. Count that check in the normal message/time budget; do not infer success from socket-written. For a closed initial analysis barrier, use a small genuine initial analysis for this check, not an empty ping that would falsely complete an analysis task. If the check is held/refused/unknown, stop further work and explain the recorded state. This is a model workflow instruction; the core preflight only enforces the observable reception prerequisites.
 
 Send one concrete task at a time using `collaboration_send` with a fresh message ID and, for guided work, a fresh task UUID and intent. The server supplies the shared context, orientation, exact draft for review and copyable native `SendMessage` reply envelope. Keep working on Codex's part while Claude answers. Avoid writing the same files; analysis/review requests grant no implementation permissions. Delegate only work already authorized by the human.
 

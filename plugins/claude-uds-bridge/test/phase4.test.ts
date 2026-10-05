@@ -6,7 +6,7 @@ import {startPanel} from '../src/panel';
 import {nativeFixture,until} from './collaboration-fixture';
 import {Database} from 'bun:sqlite';
 const root=resolve(import.meta.dir,'..');
-async function fixture(dropAcknowledgement=false){const f=await nativeFixture(dropAcknowledgement);const p=startPanel({configDir:f.config,stateDir:f.state,codexHome:f.root,pluginRoot:root,ipcPath:f.desktop.path});
+async function fixture(dropAcknowledgement=false,reception:'accept'|'default'='accept'){const f=await nativeFixture(dropAcknowledgement,{reception});const p=startPanel({configDir:f.config,stateDir:f.state,codexHome:f.root,pluginRoot:root,ipcPath:f.desktop.path});
  const token=new URL(p.url).hash.slice(7);const auth=await fetch(p.origin+'/api/v1/session',{method:'POST',headers:{Origin:p.origin,'Content-Type':'application/json'},body:JSON.stringify({token})});expect(auth.status).toBe(200);
  const {csrf}=await auth.json() as {csrf:string};const cookie=auth.headers.get('set-cookie')!.split(';')[0]!;
  const call=(path:string,body?:unknown,headers:Record<string,string>={})=>fetch(p.origin+'/api/v1/'+path,{method:body===undefined?'GET':'POST',headers:{Cookie:cookie,...(body===undefined?{}:{Origin:p.origin,'Content-Type':'application/json','X-CSRF-Token':csrf}),...headers},body:body===undefined?undefined:JSON.stringify(body)});
@@ -81,7 +81,7 @@ test('two local panels use separate cookie names and survive parallel browser se
  }finally{await other.close();await x.close();}});
 
 test('human project authorization API is scoped, authenticated, confirmed, versioned and revocable without rewriting chat policy',async()=>{
- const x=await fixture();try {
+ const x=await fixture(false,'default');try {
   const path='project-authorization?'+new URLSearchParams({ownerThread:x.f.desktop.threadId,project:x.f.root});
   expect((await fetch(x.p.origin+'/api/v1/'+path)).status).toBe(401);
   const state=await (await x.call(path)).json() as {enabled:boolean;revision:number;chatPolicy:string;receiverSupported:boolean};expect(state.enabled).toBe(false);expect(state.chatPolicy).toBe('default');expect(state.receiverSupported).toBe(true);

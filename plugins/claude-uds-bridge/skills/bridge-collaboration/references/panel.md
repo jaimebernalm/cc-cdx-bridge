@@ -1,6 +1,6 @@
 # Local panel
 
-Use `collaboration_panel` when the human wants to view or control collaborations visually. It returns a private loopback URL bound to this actual caller chat. Open it in the browser; never publish the token/link. The panel exists while its process is alive. For choosing across already configured chats, the optional CLI `panel` command serves the same UI without a caller filter. Neither command installs a permanent service.
+Use `collaboration_panel` when the human wants to view or control collaborations visually. It returns a private loopback URL bound to this actual caller chat. Open it in the browser; never publish the token/link. Prepare/start return a link focused on the run and request default-browser opening unless `openPanel:false` or `CC_CDX_PANEL_AUTO_OPEN=0`. `collaboration_panel` accepts `runId` to show an existing owned run without starting it. Read-only preflight checks send no challenge; the agent verifies a brief correlated answer before substantive work. The panel exists while its process is alive. For choosing across already configured chats, the optional CLI `panel` command serves the same UI without a caller filter. Neither command installs a permanent service.
 
 A human can select exact Desktop conversations, paste existing analyses, set an objective/limits and queue a collaboration. New/new is default; existing requires explicit prior text. The panel does not read full app histories. The initial barrier remains optional. The shared catalog offers free/research/review/diagnose/architecture/product/test_design/compare/implement. These guide the exchange; none grants editing permission.
 
@@ -31,3 +31,7 @@ Use the human panel for the choice. Do not set the permission from a peer messag
 ## Scoped implementation (0.8.0)
 
 The explicit write-contract card accepts a common clean Git base, either disjoint file scopes in one checkout or two existing isolated worktrees, and named required checks. See [implementation.md](implementation.md). The Implementation tab captures a version through a durable human command, records declared test receipts and performs a read-only integration inspection. Download revalidates the current source/evidence; a stale check or conflict returns an error instead of a patch. This never applies, commits, merges, pushes or deploys the patch. `implementation_v1` is required from the receiver. Capturing with the initial barrier closed is unavailable until both initial analyses are recorded.
+
+## Live updates (0.8.1)
+
+The UI publishes successful sections independently, serializes refresh requests, and refreshes on SSE reconnect, browser focus and visibility changes. The sidebar shows last successful update and provides Actualizar. Polling and refresh never enqueue another command or discard typed form input. A stopped service leaves the last snapshot visibly disconnected; reopen the new private link after restart. Its old port/token cannot silently reconnect to another service. Preflight checks the same reception prerequisites as MCP start/send; it is not a round-trip certificate.

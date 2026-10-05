@@ -227,3 +227,11 @@ Para escritura coordinada, prepara un contrato explícito sobre una base Git com
 Los tests y veredictos de los agentes siguen siendo declaraciones; la preparación verifica condiciones técnicas, no consenso. Se requieren receptores con `implementation_v1`: actualizar archivos no recarga procesos vivos. [Workflow y API de implementación](plugins/claude-uds-bridge/skills/bridge-collaboration/references/implementation.md).
 
 Piloto nativo validado en macOS con Codex y Claude Desktop: escritura en worktrees separados, integración de la versión corregida con 31 pruebas aprobadas, revisión atribuida a esa versión y descarga real del parche desde el panel. Un cambio posterior invalida la preparación y el panel muestra el rechazo de descarga. La prueba conserva permisos, ajustes e índices originales; no publica cambios ni certifica consenso. La candidata está instalada localmente; todavía requiere revisión y CI de su PR.
+
+### Inicio y panel en 0.8.1
+
+Antes de empezar, `collaboration_preflight` comprueba la recepción del chat y la autorización de su carpeta. Un chat con `default` necesita una autorización recordada utilizable; `hold`/`refuse` explícitos mantienen su prioridad. El MCP no cambia permisos. Si el diálogo de `inbox` no se confirma, se usa la autorización del panel sin interpretar `decline` como una elección humana. Los mensajes denegados no se recuperan.
+
+Preparar/iniciar devuelve el enlace privado de la colaboración y solicita abrir el navegador local. `openPanel:false` desactiva esa apertura; `CC_CDX_PANEL_AUTO_OPEN=0` permite uso sin escritorio. El agente puede mostrar el enlace en el navegador de Codex. La página actualiza secciones independientemente y muestra la última actualización, con reconexión y botón Actualizar. Si se detiene el servicio, abre el enlace nuevo que devuelva el MCP; el enlace anterior no se recicla. Detalles y validación: [RECEPCION_Y_PANEL.md](docs/RECEPCION_Y_PANEL.md).
+
+El panel abre en inglés por defecto. El selector **Language / Idioma** permite elegir **English** o **Español** sin perder el formulario ni cambiar la colaboración. La elección se recuerda al recargar ese panel en el mismo navegador; un servicio con otra dirección local empieza en inglés. El idioma de la interfaz no traduce las aportaciones de los agentes.

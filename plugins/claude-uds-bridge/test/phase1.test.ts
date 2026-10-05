@@ -145,7 +145,7 @@ async function liveFixture() {
   });server.listen(peerPath);await once(server,'listening');chmodSync(peerPath,0o600);
   const record={pid:process.ppid,sessionId:peerId,messagingSocketPath:peerPath,cwd:root,peerProtocol:1,name:'Repeated name',entrypoint:'claude-desktop',status:'idle',procStart:await processStart(process.ppid),version:'2.1.286'};
   const write=(extra:Record<string,unknown>={})=>writeFileSync(join(configDir,'sessions',`${process.ppid}.json`),JSON.stringify({...record,...extra}),{mode:0o600});write();
-  const bridge=new Bridge(desktop.threadId,configDir,stateDir,desktop.path);await bridge.start(sockets,root,bridge.beginSession());bridge.updateRuntime({status:'idle',mode:'prompting'});
+  const bridge=new Bridge(desktop.threadId,configDir,stateDir,desktop.path);await bridge.start(sockets,root,bridge.beginSession());bridge.updateRuntime({status:'idle',mode:'prompting'});await bridge.setPolicy('accept');
   const collaboration=new Collaboration(bridge.runs,desktop.threadId,{configDir,stateDir,ipcPath:desktop.path},bridge);
   const make=()=>collaboration.prepare({requestId:randomUUID(),peerId,context,limits,revisionPolicy:'same'});
   const transmit=async (fields:Record<string,unknown>)=>{
@@ -249,11 +249,11 @@ test('receiver socket gate rejects a cancelled outbound intention before any pee
 
 test('MCP phase-1 API uses caller identity, reconstructs logs across processes and exports without file writes',async()=>{
   const f=await liveFixture();let client=new Client({name:'phase1',version:'1.0'});
-  const connect=()=>client.connect(new StdioClientTransport({command:process.execPath,args:[process.env.UDS_MCP_TEST_ENTRYPOINT??join(pluginRoot,'src/server.ts')],env:{...process.env,CODEX_HOME:f.root,CLAUDE_CONFIG_DIR:f.configDir}}));
+  const connect=()=>client.connect(new StdioClientTransport({command:process.execPath,args:[process.env.UDS_MCP_TEST_ENTRYPOINT??join(pluginRoot,'src/server.ts')],env:{...process.env,CODEX_HOME:f.root,CLAUDE_CONFIG_DIR:f.configDir,CC_CDX_PANEL_AUTO_OPEN:'0'}}));
   const call=(name:string,args:Record<string,unknown>,owner=f.desktop.threadId)=>client.callTool({name,arguments:args,_meta:{threadId:owner}});
   const data=(result:Awaited<ReturnType<typeof call>>)=>JSON.parse((result.content as {type:string;text:string}[])[0]!.text);
   try {
-    await connect();const tools=await client.listTools();expect(tools.tools.filter(t=>t.name.startsWith('collaboration_'))).toHaveLength(15);
+    await connect();const tools=await client.listTools();expect(tools.tools.filter(t=>t.name.startsWith('collaboration_'))).toHaveLength(16);
     const prepared=data(await call('collaboration_prepare',{requestId:randomUUID(),peerId:f.peerId,context,limits}));
     expect(f.frames).toHaveLength(0);expect((await call('collaboration_start',{runId:prepared.id,supervised:true})).isError).not.toBe(true);
     const messageId=randomUUID();expect((await call('collaboration_send',{runId:prepared.id,messageId,text:'MCP controlled message'})).isError).not.toBe(true);
@@ -307,6 +307,7 @@ test('managed /clear keeps verified receipts but blocks new-session input, raw s
     expect(written).toBe(false);
     expect(f.frames.filter(frame => frame.type === 'user')).toHaveLength(1);
     expect(f.bridge.runs.status(run.id, f.desktop.threadId).messagesUsed).toBe(1);
+    await f.bridge.setPolicy('accept'); // Isolate reservation fencing from the new reception gate.
     const selected = await f.collaboration.prepare({ requestId: randomUUID(), peerId: cleared, context, limits, revisionPolicy: 'same' });
     await expect(f.collaboration.start(selected.id)).rejects.toThrow('already belongs');
     f.bridge.runs.stop(run.id, f.desktop.threadId, 'cancelled', 'Close the cleared conversation');

@@ -1,4 +1,6 @@
 import { version } from './version';
+import { PreflightBlocked } from './preflight';
+import { PanelOpening, panelLink } from './panel-opening';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
@@ -26,6 +28,7 @@ const stateDir = join(codexHome, 'plugin-state', 'claude-uds-bridge');
 let bridge: Bridge | undefined;
 let dialogs: HeldDialogs | undefined;
 let panel:ReturnType<typeof startPanel>|undefined;
+const panelOpening = new PanelOpening();
 
 export function callerThread(meta: Record<string, unknown> | undefined): string {
   let turn: unknown = meta?.['x-codex-turn-metadata'];
@@ -57,6 +60,7 @@ const server = new McpServer({ name: 'claude-uds-bridge', version }, { instructi
   + 'and an outcome that comes back unknown needs a status check before any resend.\n'
   + 'Answer a peer when it needs something from you.\n'
   + 'Settle who owns which files before two agents edit one repository. This plugin holds no locks.\n'
+  + 'Before starting work, use collaboration_preflight. A default Codex inbox without a usable project grant must be authorized by the human in the panel; never change it yourself. Prepare/start return a private panel link and request local browser opening by default. If browser dispatch fails, show that panel with open_in_codex when available, unless the human opts out. Avoid opening a second window after successful dispatch unless the human prefers the Codex browser. Verify a brief correlated response before substantial work. A decline/cancel from an MCP dialog means no confirmed choice, not proof the human rejected it: use the authenticated panel instead of repeating the dialog. '
   + 'For a registered collaboration, use collaboration_send and preserve the CC_CDX_RUN_V1 reply header. '
   + 'Preparing or starting a run sends no model task and grants no reception or execution permission. '
   + 'Use bridge-collaboration for free collaboration or optional research, review, diagnosis, architecture, product, test-design, comparison and implementation guidance. Agent reports are declarations, not core-validated consensus. '
@@ -99,10 +103,23 @@ function collaboration(meta: Record<string,unknown> | undefined) {
   const bound=current(meta);
   return new Collaboration(bound.runs,bound.threadId,{configDir,stateDir,ipcPath:join(codexHome,'ipc','ipc.sock')},bound);
 }
-server.registerTool('collaboration_panel',{description:'Open an authenticated loopback panel bound to this actual caller chat. Reads the shared collaboration ledger and lets the human queue start/control actions. Returns a private URL; do not share it. Does not itself start work, change permissions or install a persistent service.',inputSchema:{},annotations:{openWorldHint:false}},async(_args,extra)=>{
-  const owner=callerThread(extra._meta);current(extra._meta);
+function currentPanel(meta: Record<string,unknown>|undefined) {
+  const owner=callerThread(meta);current(meta);
   panel??=startPanel({configDir,stateDir,ipcPath:join(codexHome,'ipc','ipc.sock'),codexHome,pluginRoot:dirname(import.meta.dir),ownerThread:owner});
-  return result({url:panel.url,scope:'caller_chat',version});
+  return panel;
+}
+async function panelFor(meta:Record<string,unknown>|undefined,key:string,target:{runId?:string;authorization?:boolean},open=true) {
+  const url=panelLink(currentPanel(meta).url,target);
+  return {url,scope:'caller_chat',version,browser:await panelOpening.open(key,url,open),
+    instruction:open?'Private local link: show it to this human only. If local browser dispatch failed, open with open_in_codex when available. Avoid a second window unless requested. Do not publish the link or its token.':'Do not open a window for this action. Honor openPanel:false; the private link remains available to this human. Do not publish its token.'};
+}
+server.registerTool('collaboration_panel',{description:'Open an authenticated loopback panel bound to this actual caller chat. Optional runId navigates to that exact collaboration. Does not start work or change permissions.',inputSchema:{runId:uuid.optional()},annotations:{openWorldHint:false}},async({runId},extra)=>{
+  if(runId)collaboration(extra._meta).store.assertOwner(runId,callerThread(extra._meta));
+  return result({url:panelLink(currentPanel(extra._meta).url,{runId}),scope:'caller_chat',version});
+});
+server.registerTool('collaboration_preflight',{description:'Check the exact participants and reception before work. Read-only, no messages or permission changes. readyForCheck only permits a brief round-trip check; it does not prove Claude reception. If blocked, open the returned panel for a human choice; never repeatedly invoke an unconfirmed inbox dialog.',inputSchema:{peerId:uuid},annotations:{readOnlyHint:true,openWorldHint:false}},async({peerId},extra)=>{
+  const check=await collaboration(extra._meta).preflight(peerId);
+  return result({...check,...(!check.readyForCheck?{panel:{url:panelLink(currentPanel(extra._meta).url,{authorization:true}),scope:'caller_chat'}}:{})});
 });
 server.registerTool('collaboration_panel_command',{description:'Read and apply one persisted human action submitted in the authenticated local panel. Verifies the real caller metadata and native project; arguments contain only the command UUID. No peer notification can invent approval. Repeating applied UUID returns its recorded result. Failed/unfinished applications are not replayed. After create, coordinate the recorded objective using the existing collaboration tools.',inputSchema:{commandId:uuid},annotations:{openWorldHint:false}},async({commandId},extra)=>{
   const c=collaboration(extra._meta),options={configDir,stateDir,ipcPath:join(codexHome,'ipc','ipc.sock')};
@@ -115,11 +132,18 @@ server.registerTool('collaboration_discover', { description:'List process-verifi
   });
 server.registerTool('collaboration_prepare', { description:'Prepare a supervised collaboration between this caller Codex chat and one exact Claude Desktop ID. Records context and verified repo/worktree/revision without sending messages or reserving conversations. Reuse requestId only for the identical preparation. Different revisions require revisionPolicy compare and a fixed comparisonBase. No permission or settings change.',
   inputSchema:{requestId:uuid,peerId:uuid,context:contextSchema,limits:limitsSchema.default({maxMessages:24,maxSeconds:1800}),
-    revisionPolicy:z.enum(['same','compare']).default('same'),comparisonBase:z.string().min(1).max(256).optional(),routine:routineSchema.optional(),coordination:coordinationSchema.optional(),implementation:implementationSchema.optional()},annotations:{openWorldHint:false} },
-  async (args,extra)=>result(await collaboration(extra._meta).prepare(args)));
+    revisionPolicy:z.enum(['same','compare']).default('same'),comparisonBase:z.string().min(1).max(256).optional(),routine:routineSchema.optional(),coordination:coordinationSchema.optional(),implementation:implementationSchema.optional(),openPanel:z.boolean().default(true)},annotations:{openWorldHint:false} },
+  async ({openPanel,...args},extra)=>{
+    const c=collaboration(extra._meta),run=await c.prepare(args),preflight=await c.preflight(args.peerId);
+    return result({...run,preflight,panel:await panelFor(extra._meta,'prepare:'+run.id,{runId:run.id,authorization:!preflight.readyForCheck},openPanel&&!preflight.readyForCheck)});
+  });
 server.registerTool('collaboration_start', { description:'Revalidate and reserve both prepared conversations for one active collaboration. Sends no work. supervised must be true because effective Claude reception remains unknown; this is a mode choice, not approval to alter settings. Busy Claude requires waiting or an explicit allowBusyPeer choice.',
-  inputSchema:{runId:uuid,supervised:z.literal(true),allowBusyPeer:z.boolean().default(false)},annotations:{openWorldHint:false} },
-  async ({runId,allowBusyPeer},extra)=>result(await collaboration(extra._meta).start(runId,allowBusyPeer)));
+  inputSchema:{runId:uuid,supervised:z.literal(true),allowBusyPeer:z.boolean().default(false),openPanel:z.boolean().default(true)},annotations:{openWorldHint:false} },
+  async ({runId,allowBusyPeer,openPanel},extra)=>{
+    const c=collaboration(extra._meta);c.store.assertOwner(runId,c.owner);
+    try {const run=await c.start(runId,allowBusyPeer);return result({...run,panel:await panelFor(extra._meta,'start:'+runId,{runId},openPanel)});}
+    catch(error){if(!(error instanceof PreflightBlocked))throw error;return {...result({started:false,preflight:error.preflight,panel:await panelFor(extra._meta,'blocked:'+runId,{runId,authorization:true},openPanel)}),isError:true};}
+  });
 server.registerTool('collaboration_status', {description:'Reconstruct the caller-owned collaboration, participants, ordered events and transport evidence from persistent state. Reserved/submitting outcomes remain uncertain and are never resent automatically. Omit runId to list this caller’s runs.',
   inputSchema:{runId:uuid.optional()},annotations:{readOnlyHint:true,openWorldHint:false} },async ({runId},extra)=>{
     const c=collaboration(extra._meta); return result(runId?c.store.status(runId,c.owner):c.store.list(c.owner));
@@ -170,7 +194,7 @@ server.registerTool('inbox', { description: 'Open a dialog the user answers. Use
       requestedSchema: { type: 'object', properties: { policy: { type: 'string', title: 'Inbox',
         enum: ['default', 'accept', 'hold', 'refuse'], enumNames: ['Default: compare permission modes', 'Accept: receive', 'Hold: keep back', 'Refuse: reject'] } }, required: ['policy'] } });
     if (answer.action === 'accept') await bridge.setPolicy(policySchema.parse(answer.content?.policy));
-    return result({ action: answer.action, ...bridge.status() });
+    return result({ action: answer.action, confirmed:answer.action==='accept', ...bridge.status(), ...(answer.action!=='accept'?{message:'No confirmed human choice was received. This does not prove the human declined. Do not repeat the dialog; use the project authorization panel.',panel:{url:panelLink(currentPanel(extra._meta).url,{authorization:true}),scope:'caller_chat'}}:{}) });
   }
   const held = bridge.held()[0];
   if (!held) return result({ heldCount: 0 });

@@ -6,6 +6,10 @@ import net from 'node:net';
 import {once} from 'node:events';
 import {ProjectAuthorizations} from '../src/project-authorization';
 import {nativeFixture,until} from './collaboration-fixture';
+import {formatManaged} from '../src/managed-message';
+import {formatWork} from '../src/routines';
+import {Collaboration} from '../src/collaboration';
+import {contextSchema,limitsSchema} from '../src/runs';
 
 test('project grant persists, aliases share scope, recreated folders and other worktrees do not; CAS and old actions cannot regrant',()=>{
  const root=mkdtempSync('/tmp/project-auth-'),project=join(root,'project'),other=join(root,'other');mkdirSync(project);mkdirSync(other);symlinkSync(project,join(root,'alias'));
@@ -24,9 +28,17 @@ test('project grant persists, aliases share scope, recreated folders and other w
 });
 
 async function running(){const f=await nativeFixture();f.desktop.setPermissions({approvalPolicy:'never',sandboxPolicy:{type:'dangerFullAccess'}});f.bridge.updateRuntime({status:'idle',mode:'bypass'});const c=await f.connect();
- const prepared=await f.call(c,'collaboration_prepare',{requestId:randomUUID(),peerId:f.peerId,context:{objective:'Project authorization acceptance'},coordination:{initialBarrier:false,leaseSeconds:300},limits:{maxMessages:20,maxSeconds:300}});expect(prepared.error).toBeFalsy();const id=prepared.data.id;expect((await f.call(c,'collaboration_start',{runId:id,supervised:true})).error).toBeFalsy();
+ const collaboration=new Collaboration(f.bridge.runs,f.desktop.threadId,{configDir:f.config,stateDir:f.state,ipcPath:f.desktop.path},f.bridge);
+ const prepared=await collaboration.prepare({requestId:randomUUID(),peerId:f.peerId,context:contextSchema.parse({objective:'Project authorization acceptance'}),coordination:{initialBarrier:false,leaseSeconds:300},limits:limitsSchema.parse({maxMessages:20,maxSeconds:300}),revisionPolicy:'same'});const id=prepared.id;await collaboration.start(id);
+ await f.bridge.setPolicy('default');
  const authorizations=new ProjectAuthorizations(f.state);const grant=()=>authorizations.change({project:f.root,ownerThread:f.desktop.threadId,actionId:randomUUID(),enabled:true,expectedRevision:authorizations.status(f.root).revision,confirmed:true});
- const send=async(text:string,context=1)=>{const taskId=randomUUID(),messageId=randomUUID();expect((await f.call(c,'collaboration_send',{runId:id,messageId,text:'Read only check',task:{taskId,intent:'discuss'}})).error).toBeFalsy();await f.respond(id,messageId,{kind:'response',taskId,declaredState:'perspective',disagreements:[]},text,context);};
+ // Exercise inbound routing independently of the new MCP preflight gate:
+ // these frames model already in-flight work whose reply arrives after policy changes.
+ const send=async(text:string,context=1)=>{const taskId=randomUUID(),messageId=randomUUID(),task={taskId,intent:'discuss' as const};
+  f.bridge.runs.reserveOutgoing(id,f.desktop.threadId,messageId,f.peerId,'Read only check',undefined,task);
+  await f.bridge.sendMessage(f.peerId,formatManaged({runId:id,messageId,contextVersion:1},formatWork(task,'Read only check')),false,{runId:id,messageId});
+  await f.respond(id,messageId,{kind:'response',taskId,declaredState:'perspective',disagreements:[]},text,context);
+ };
  return {f,c,id,grant,send,authorizations,async close(){authorizations.close();await c.close();await f.close();}};
 }
 test('default receiver inherits only new verified replies; revocation stops inheritance without changing the chat policy',async()=>{
@@ -53,6 +65,7 @@ test('a grant for a different folder does not authorize this receiver',async()=>
 test('revocation also covers barrier-buffered replies and preserves an explicit chat accept',async()=>{
  const f=await nativeFixture();f.desktop.setPermissions({approvalPolicy:'never',sandboxPolicy:{type:'dangerFullAccess'}});f.bridge.updateRuntime({status:'idle',mode:'bypass'});const c=await f.connect();const auth=new ProjectAuthorizations(f.state);
  try {
+  await f.bridge.setPolicy('default');
   const grant={project:f.root,ownerThread:f.desktop.threadId,actionId:randomUUID(),enabled:true,expectedRevision:0,confirmed:true as const};auth.change(grant);await Bun.sleep(3);
   const p=await f.call(c,'collaboration_prepare',{requestId:randomUUID(),peerId:f.peerId,context:{objective:'Revocation behind barrier'},coordination:{initialBarrier:true,leaseSeconds:300},limits:{maxMessages:10,maxSeconds:300}});expect(p.error).toBeFalsy();const runId=p.data.id;await f.call(c,'collaboration_start',{runId,supervised:true});
   const ownTask=randomUUID(),peerTask=randomUUID(),messageId=randomUUID();let status=(await f.call(c,'collaboration_status',{runId})).data;
