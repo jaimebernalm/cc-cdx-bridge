@@ -37,7 +37,7 @@ Guardar logs y evidencia nativa bajo `.local/phase5/` (ignorada por Git). El inf
 | Matriz original | Comprobación necesaria |
 |---|---|
 | L01–L02 | Ida/vuelta real activa/inactiva; entrada exacta una vez, resultado atribuido |
-| L03 | Cola con Claude ocupado: demostrar que su herramienta en curso no se interrumpe; fixture no acredita comportamiento de la app |
+| L03 | Pasado en el ensayo `REAL_P5_TOOL_702`: mismo PID, herramienta de 35,002111 s y exit 0. Segundo mensaje reservado a +29,781409 s y escrito en el socket 4,897702 s antes del fin; ambas respuestas correlacionadas consumidas una vez. Claude lo leyó al devolver Bash; no se afirma lectura instantánea. Los intentos anteriores no acreditan concurrencia. |
 | L04–L05 | Continuación existente/existente y mixta; identificar procedencia, sin inventar historial |
 | L06 | Identidades exactas con nombres repetidos; entorno aislado + descubrimiento real |
 | L07–L08 | Recepción preservada; diferencias de clase y permisos recordados probadas sin aflojar políticas explícitas |
@@ -97,14 +97,14 @@ Esta tabla distingue pruebas con modelos Desktop de fixtures. «Pendiente» no e
 |---|---|
 | L01 | Pasado: investigación/revisión con el chat propietario activo; seis mensajes correlacionados, consumidos. |
 | L02 | Pasado: chat Codex inactivo despertado desde UI, dos mensajes y cierre. |
-| L03 | Parcial: se envió una segunda tarea con Claude observado ocupado; completó sus ocho tests sin interrupción. No hay marcas de tiempo que prueben llegada durante su herramienta. El ensayo adicional `REAL_P5_TOOL_701` fue detenido por la pregunta humana de Claude: su instrucción previa prohíbe modificar archivos y el ensayo pedía dos temporales. Se cerró incompleto sin segunda tarea, reenvío ni cambio de permisos. Repetir con autorización expresa o una herramienta sin archivos y evidencia temporal antes de dar el caso completo por pasado. |
+| L03 | Pasado en el ensayo `REAL_P5_TOOL_702`: mismo PID, herramienta de 35,002111 s y exit 0. Segundo mensaje reservado a +29,781409 s y escrito en el socket 4,897702 s antes del fin; ambas respuestas correlacionadas consumidas una vez. Claude lo leyó al devolver Bash; no se afirma lectura instantánea. Los intentos anteriores no acreditan concurrencia. |
 | L04 | No repetido con 0.7.0: continuación de dos análisis previos comprobada en fases anteriores. |
 | L05 | Pasado: inicio mixto con análisis previo de Codex y análisis nuevo de Claude, procedencia explícita. |
 | L06 | Fixtures pasan con alias iguales e identidades exactas. No se crearon dos conversaciones Claude reales con nombres iguales; ensayo nativo pendiente. |
 | L07 | Pasado: chat `default` usa autorización existente sin cambio de políticas ni ajustes durante el ensayo. La comparación de Claude es contra la línea base de este turno, no contra toda la historia del proyecto. |
 | L08 | Fixtures prueban prioridad de política explícita y bloqueo. Los ensayos nativos de retención/denegación son históricos de fase 4; no se cambiaron los permisos reales para repetirlos ahora. |
 | L09 | UI aislada: pausa/reanudación correctas. Evidencia nativa de fase 4 reutilizable como histórica, no atribuida a 0.7.0. |
-| L10 | Cancelación desde UI aislada y tests de llegada tardía pasan. Falta provocar deliberadamente una respuesta tardía en una app real con 0.7.0. |
+| L10 | Pasado en el ensayo nativo `REAL_P5_LATE_703`: proceso Python vivo descendiente de Claude observado antes de cancelar. La respuesta posterior queda `late`/`dropped`, sin input nativo ni informe materializado; el run sigue cancelado. |
 | L11 | Servicio de panel y receptores reiniciados con historial conservado y sin duplicados. Reinicio completo de ambas apps con 0.7.0 pendiente: Codex ejecuta este turno y otra conversación Claude estaba trabajando. No cerrar las apps automáticamente en esas condiciones. |
 | L12 | Pasado: investigación de código, contraste, ejecución de ocho tests por Claude y resultado revisado. No prueba mejora de calidad frente a un agente solo. |
 | L13 | Pasado: revisión de versión exacta, matices visibles, cierre del autor con desacuerdos; arreglos posteriores respaldados por regresiones. La revisión no audita esos arreglos posteriores. |
@@ -120,11 +120,17 @@ Esta tabla distingue pruebas con modelos Desktop de fixtures. «Pendiente» no e
 2. Volver a este chat, leer esta sección y el inventario; comprobar distribución cargada, capacidades, proyecto exacto y receptor único.
 3. Consultar el ensayo final ya cerrado y sus entradas antes de enviar nada. No reabrir/repetir su orden. Comprobar historia y autorización revisión 1 conservadas.
 4. Ejecutar una colaboración nueva y breve desde el panel con el chat de prueba existente; correlacionar respuesta y contar entradas. Registrar por separado MCP y receptor 0.7.0 y marcar L11 solo después de esa evidencia.
-5. Para L03, registrar inicio/fin de una herramienta acotada de Claude y comprobar que el segundo mensaje se envió entre ambos, sin interrumpirla. L06, L10 y L17 necesitan ensayos nativos separados; un chat nuevo requiere petición explícita del usuario, no la sustituye un fixture.
+5. L03 y L10 ya cuentan con ensayos nativos y evidencia privada de este turno. L06 y L17 necesitan chats temporales; hay una pregunta asíncrona pendiente para autorizarlos. No crear chats hasta recibir respuesta explícita. Repetir después de recargar solo si aparece una diferencia relevante en el nuevo MCP.
 6. Actualizar esta tabla y el resumen saneado. No anunciar la matriz completa ni la fase 5 cerradas antes de resolver esos pendientes.
 
-### Estado al entregar el turno
+### Estado al entregar el turno (continuación del 4 de octubre)
 
-No quedan colaboraciones de prueba activas ni reservas. El panel real 0.7.0 queda abierto; se detuvieron el panel antiguo y el fixture temporal. Claude conserva una pregunta humana pendiente del ensayo L03: no aceptarla automáticamente al reanudar; la colaboración original ya está cerrada. Si el usuario autoriza los temporales, usar IDs y run nuevos para repetir la prueba, sin atribuir una respuesta tardía al run nuevo. La pregunta asíncrona de Codex explica exactamente ese alcance.
+L03 completado y cerrado con cuatro mensajes. Evidencia privada: `tool-702-evidence.json`, `tool-702-core.json`, `tool-702-observation.json` y export. Solo se sobrescribieron los dos temporales autorizados. L10 completado con cancelación real, respuesta tardía descartada y estado terminal conservado; evidencia privada `late-703-evidence.json`, core/observación/export. Los ajustes de Claude siguen idénticos a la línea base privada original. No quedan runs de prueba activos.
 
-Para completar el piloto faltan los ensayos nativos indicados en la tabla, incluyendo reapertura de apps y chat nuevo con MCP 0.7.0. No preparar una release ni declarar la matriz aprobada hasta completarlos. El chat nuevo necesita autorización explícita según la herramienta de creación de chats; los existentes siguen disponibles.
+**Antes de continuar, recargar las apps.** El doctor llamado desde el MCP de este chat devuelve `distribution_incomplete`, porque conserva el proceso anterior ligado al cache sustituido. El CLI instalado 0.7.0 comprueba `distribution:ok`, `receiver:ok`, versión de receptor 0.7.0 y autorización vigente. Esto demuestra la diferencia entre instalar archivos y actualizar el MCP vivo; no reconstruir ni reinstalar de nuevo para resolver un proceso antiguo. Evidencia privada: `doctor-current-mcp.json` y `doctor-current-installed.json`. Los ensayos nativos aquí prueban el comportamiento del transporte con receptor 0.7.0 y MCP preexistente; no acreditan que toda la app haya cargado 0.7.0.
+
+Claude ya recibió la autorización humana de los dos temporales y no hay que repetir aquella pregunta. Una respuesta del primer run cerrado se descartó correctamente; el primer seguimiento llegó después de terminar la herramienta y se cerró incompleto. No reutilizar esos runs ni atribuir sus respuestas al ensayo 702.
+
+El panel real 0.7.0 queda abierto. Está pendiente la respuesta a la pregunta de crear y archivar un chat temporal de Codex y otro de Claude para L06/L17. Esa autorización es distinta de la de los dos temporales. Mantener la autorización recordada del proyecto y las políticas de los chats; no cambiarlas durante reapertura.
+
+Tras la reapertura, verificar MCP/distribución/receptor y recuperación de historial, después continuar con el inventario. Todavía no se declara fase 5 cerrada, ni se abrió PR/release de fase 5.

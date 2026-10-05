@@ -88,7 +88,7 @@
     },
     {
       "case": "L03",
-      "outcome": "blocked",
+      "outcome": "passed",
       "version": "0.7.0"
     },
     {
@@ -123,7 +123,7 @@
     },
     {
       "case": "L10",
-      "outcome": "not_run",
+      "outcome": "passed",
       "version": "0.7.0"
     },
     {
