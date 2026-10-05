@@ -200,3 +200,26 @@ test('binding requires the requested snapshot: branch, detached HEAD and commit'
   expect(() => store.bindManual(panel, t.id, { ...c, head: 'b'.repeat(40) })).toThrow('HEAD moved');
   expect(store.bindVerified(t.id, c, receipt(c, claim.correlationId)).state).toBe('bound');
 });
+
+test('a chat created under a grant still binds after the grant is revoked', () => {
+  const g = store.grant(panel, grantInput());
+  const t = store.request(agent, input()).ticket, claim = store.claimCreating(t.id, 'x'), c = candidate();
+  store.markCreated(t.id, claim.epoch);
+  store.revokeGrant(panel, g.id);
+  expect(store.bindVerified(t.id, c, receipt(c, claim.correlationId))).toMatchObject({ state: 'bound', bound: { binding: 'host_receipt' } });
+});
+
+test('the binding window starts when the chat is created, not at the request', () => {
+  const t = store.requestFromPanel(panel, input({ ttlSeconds: 60 })).ticket;
+  now += 50_000;
+  const claim = store.claimCreating(t.id, 'x');
+  store.markCreated(t.id, claim.epoch);
+  now += 50_000; // past the original expiry, within 60s of creation
+  const c = candidate({ startedAt: now });
+  expect(store.get(t.id).state).toBe('awaiting_receiver');
+  expect(store.bindVerified(t.id, c, receipt(c, claim.correlationId))).toMatchObject({ state: 'bound' });
+  const late = store.requestFromPanel(panel, input({ ttlSeconds: 60 })).ticket, lateClaim = store.claimCreating(late.id, 'y');
+  store.markCreated(late.id, lateClaim.epoch);
+  now += 61_000;
+  expect(store.get(late.id).state).toBe('expired');
+});

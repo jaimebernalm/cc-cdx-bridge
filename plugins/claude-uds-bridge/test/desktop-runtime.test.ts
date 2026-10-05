@@ -72,3 +72,13 @@ test('scoped implementation through both MCP hosts preserves dirty scope, exact 
  await call('send',{runId:run.id,messageId:randomUUID(),text:'DIRTY_SCOPE_ALLOWED'});await until(()=>f.desktop.submissions.length===1);writeFileSync(resolve(f.root,'claude.txt'),'after review\n');expect((await call('implementation',{runId:run.id,operationId:randomUUID(),action:{action:'inspect'}})).ready).toBe(false);
  }finally{await client.close();await server.close();await runtime.close();await codex.close();await f.close()}
 },20000);
+
+test('ticket_status works on a fresh state before any creation tool has run',async()=>{
+ const f=await nativeFixture(),server=new McpServer({name:'claude-fixture',version:'1'}),client=new Client({name:'fixture',version:'1'});
+ const p=await inspectParticipant({configDir:f.config,stateDir:f.state,ipcPath:f.desktop.path},f.peerId,'claude');
+ const runtime=registerDesktopTools(server,{configDir:f.config,stateDir:f.state,ipcPath:f.desktop.path,codexHome:f.root,pluginRoot:root,openPrivatePanel:async()=>{},authenticate:async()=>({provider:'claude',sessionId:p.sessionId,pid:p.pid,procStart:p.procStart,project:f.root,binding:{method:'fixture',generation:'fixture',surface:'claude-desktop',evidence:[]}})}),[a,b]=InMemoryTransport.createLinkedPair();await Promise.all([server.connect(a),client.connect(b)]);
+ const call=async(name:string,args:Record<string,unknown>)=>{const r=await client.callTool({name:'desktop_collaboration_'+name,arguments:args});if(r.isError)throw new Error(JSON.stringify(r.content));return JSON.parse((r.content as {text:string}[])[0]!.text)};
+ try{const requested=await call('ticket_request',{input:{requestId:randomUUID(),targetProvider:'codex',project:f.root,mode:'local',adapter:'manual'}});
+  const status=await call('ticket_status',{ticketId:requested.ticket.id});expect(status.id).toBe(requested.ticket.id);
+ }finally{await client.close();await server.close();await runtime.close();await f.close()}
+},15000);

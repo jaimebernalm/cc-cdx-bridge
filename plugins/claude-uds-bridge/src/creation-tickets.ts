@@ -135,6 +135,11 @@ export class CreationTickets {
       .all(row.project, row.device, row.inode, row.target_provider, row.adapter, row.mode)
       .filter(g => (g.expires_at === null || g.expires_at > now) && (JSON.parse(g.actions) as string[]).includes(action));
   }
+  // Revocation or expiry stops future tickets; a chat already created under the grant may still bind.
+  private grantAllowedBind(id: string) {
+    const g = this.db.query<GrantRow, [string]>('SELECT * FROM creation_grants WHERE id=?').get(id);
+    return !!g && (JSON.parse(g.actions) as string[]).includes('bind');
+  }
   private withinLimits(g: GrantRow) {
     const used = this.db.query<{ state: TicketState; created_at: number }, [string]>('SELECT state,created_at FROM creation_tickets WHERE grant_id=?').all(g.id);
     const active = used.filter(row => open.includes(row.state)).length, hour = used.filter(row => row.created_at > this.now() - 3600000).length;
@@ -250,7 +255,9 @@ export class CreationTickets {
     return this.db.transaction(() => {
       const row = this.creating(id, epoch), hostRef = outcome.hostRef == null ? null : uuid.parse(outcome.hostRef);
       this.assertPinned(row);
-      return this.set(row.id, { state: 'awaiting_receiver', host_ref: hostRef, degradation: z.string().max(200).nullable().parse(outcome.degradation ?? null) },
+      // The binding window starts once the chat exists, not at the request.
+      const window = row.expires_at - row.created_at;
+      return this.set(row.id, { state: 'awaiting_receiver', expires_at: Math.max(row.expires_at, this.now() + window), host_ref: hostRef, degradation: z.string().max(200).nullable().parse(outcome.degradation ?? null) },
         'created', `executor:${row.holder}`, { hostRef, pointerOnly: true });
     }).immediate();
   }
@@ -308,7 +315,7 @@ export class CreationTickets {
       const row = this.row(id), candidate = candidateSchema.parse(rawCandidate), receipt = receiptSchema.parse(rawReceipt);
       this.bindable(row, candidate);
       const authorizedAt = row.authorized_at!;
-      if (row.grant_id && !this.matchingGrant(row, 'bind').some(g => g.id === row.grant_id)) throw new Error('This ticket needs a panel session to bind');
+      if (row.grant_id && !this.grantAllowedBind(row.grant_id)) throw new Error('This ticket needs a panel session to bind');
       if (receipt.correlationId !== row.correlation_id) throw new Error('Receipt belongs to another ticket');
       if (receipt.sessionId !== candidate.sessionId || receipt.enginePid !== candidate.pid || receipt.procStart !== candidate.procStart) throw new Error('Receipt and candidate disagree');
       if (candidate.startedAt < authorizedAt || receipt.at < authorizedAt) throw new Error('Candidate existed before authorization');
