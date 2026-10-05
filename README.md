@@ -206,3 +206,9 @@ Ejecuta el comando desde la carpeta del plugin; `--thread UUID` limita el panel 
 Tras actualizar, salir completamente de Codex y volver al mismo chat carga las herramientas nuevas. El panel muestra un requisito de recarga si el receptor aún es antiguo. Un receptor vivo puede sobrevivir a la recarga de la app: en ese caso, pide recargar solo el receptor de ese chat, después de comprobar que no hay colaboraciones activas ni entradas pendientes. El arranque normal lo reutiliza; no lo sustituye automáticamente. No modifica la recepción de Claude ni permisos de ejecución. Los mensajes privados retenidos detrás de la barrera siguen ocultos. Si una aplicación queda interrumpida o la entrega es incierta, muestra diagnóstico; no repite trabajo automáticamente.
 
 Para desarrollar la UI: `cd ui && bun install --frozen-lockfile`; el build del plugin genera backend y `panel-dist/`. La UI utiliza componentes oficiales shadcn/ui obtenidos mediante su MCP; no necesita ese MCP en el entorno de uso.
+
+### Recordar recepción por proyecto
+
+En el panel local, abre **Autorización** (también aparece al crear una colaboración), selecciona el chat y pulsa **Recordar autorización para este proyecto → Confirmar autorización**. La elección se guarda y los chats Codex nuevos con recepción `default` pueden heredarla. Puedes revocarla en el mismo lugar.
+
+El alcance es la carpeta exacta: solo futuras respuestas correlacionadas del participante Claude verificado en colaboraciones gestionadas de esa carpeta. Otro worktree requiere su propia elección. Los ajustes explícitos `accept`, `hold` o `refuse` de un chat tienen prioridad; revocar la herencia no cambia su `accept` propio. No se liberan mensajes antiguos ni se cambian los permisos de ejecución/edición o la recepción de Claude. Los receptores anteriores a 0.6.1 necesitan recargarse; el panel muestra su compatibilidad.

@@ -79,3 +79,25 @@ test('two local panels use separate cookie names and survive parallel browser se
  expect((await x.call('health',undefined,{Cookie:combined})).status).toBe(200);expect((await fetch(other.origin+'/api/v1/health',{headers:{Cookie:combined}})).status).toBe(200);
  expect((await fetch(other.origin+'/api/v1/health',{headers:{Cookie:x.cookie}})).status).toBe(401);
  }finally{await other.close();await x.close();}});
+
+test('human project authorization API is scoped, authenticated, confirmed, versioned and revocable without rewriting chat policy',async()=>{
+ const x=await fixture();try {
+  const path='project-authorization?'+new URLSearchParams({ownerThread:x.f.desktop.threadId,project:x.f.root});
+  expect((await fetch(x.p.origin+'/api/v1/'+path)).status).toBe(401);
+  const state=await (await x.call(path)).json() as {enabled:boolean;revision:number;chatPolicy:string;receiverSupported:boolean};expect(state.enabled).toBe(false);expect(state.chatPolicy).toBe('default');expect(state.receiverSupported).toBe(true);
+  const change={project:x.f.root,ownerThread:x.f.desktop.threadId,actionId:randomUUID(),enabled:true,expectedRevision:0,confirmed:true};
+  expect((await x.call('project-authorization',change,{'X-CSRF-Token':''})).status).toBe(403);
+  expect((await x.call('project-authorization',change,{Origin:'https://evil.example'})).status).toBe(403);
+  expect((await x.call('project-authorization',{...change,confirmed:false})).status).toBe(409);
+  expect((await x.call('project-authorization',{...change,project:join(x.f.root,'s')})).status).toBe(409);
+  expect((await x.call('project-authorization',{...change,ownerThread:randomUUID()})).status).toBe(409);
+  expect((await x.call('project-authorization',change)).status).toBe(200);expect((await (await x.call('project-authorization',change)).json() as {reused:boolean}).reused).toBe(true);
+  expect(x.f.bridge.policy()).toBe('default');expect(x.f.desktop.submissions).toHaveLength(0);
+  expect((await x.call('project-authorization',{...change,actionId:randomUUID()})).status).toBe(409);
+  expect((await (await x.call('project-authorization',{...change,actionId:randomUUID(),enabled:false,expectedRevision:1})).json() as {enabled:boolean}).enabled).toBe(false);
+  expect((await (await x.call('project-authorization',change)).json() as {enabled:boolean}).enabled).toBe(false);
+  const db=new Database(join(x.f.state,x.f.desktop.threadId+'.sqlite'));db.run("DELETE FROM receiver_capabilities WHERE capability='project_authorization_v1'");db.close();
+  expect((await x.call('project-authorization',{...change,actionId:randomUUID(),expectedRevision:2})).status).toBe(409);
+  expect((await (await x.call(path)).json() as {receiverSupported:boolean}).receiverSupported).toBe(false);
+ }finally{await x.close();}
+});

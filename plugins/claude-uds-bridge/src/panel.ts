@@ -10,13 +10,14 @@ import { compareProjects } from './project';
 import { readDesktopInputs, deliverToDesktop } from './desktop';
 import { doctor } from './doctor';
 import { version } from './version';
+import { ProjectAuthorizations, authorizationIdentitySchema, authorizationChangeSchema } from './project-authorization';
 import { processStart } from './claude';
 import { normalizeRoutine, routineGuides } from './routines';
 
 const equal=(a:string,b:string)=>Buffer.byteLength(a)===Buffer.byteLength(b)&&timingSafeEqual(Buffer.from(a),Buffer.from(b));
 type Options=ParticipantOptions&{codexHome:string;pluginRoot:string;ownerThread?:string;port?:number};
 export function startPanel(options:Options){
-  const store=new RunStore(options.stateDir),commands=new PanelCommands(options.stateDir);
+  const store=new RunStore(options.stateDir),commands=new PanelCommands(options.stateDir),authorizations=new ProjectAuthorizations(options.stateDir);
   const token=randomBytes(32).toString('hex'),session=randomBytes(32).toString('hex'),csrf=randomBytes(32).toString('hex');
   let exchanged=false,closed=false;const streams=new Set<()=>void>();const wakes=new Set<Promise<unknown>>();
   const assetRoot=resolve(options.pluginRoot,'panel-dist');
@@ -47,6 +48,17 @@ export function startPanel(options:Options){
       if(run.coordination?.revision!==input.command.expectedRevision)throw new Error('Control revision changed; refresh the collaboration');
     }
     return codex;
+  };
+  const authorizationIdentity=async(raw:unknown)=>{
+    const input=authorizationIdentitySchema.parse(raw);
+    if(options.ownerThread&&input.ownerThread!==options.ownerThread)throw new Error('Wrong conversation for this panel');
+    const codex=await inspectParticipant(options,input.ownerThread,'codex',true,true);
+    if(codex.project.directory!==realpathSync(input.project))throw new Error('Selected conversation project changed');
+    const selected=(await discoverParticipants(options.configDir,options.stateDir)).find(p=>p.sessionId===input.ownerThread);
+    const db=new Database(join(options.stateDir,input.ownerThread+'.sqlite'),{readonly:true});
+    try {const policy=db.query<{policy:string},[]>('SELECT policy FROM inbound_policy WHERE singleton=1').get()?.policy;
+      return {input,project:codex.project.directory,chatPolicy:policy??'default',receiverSupported:selected?.projectAuthorizationReceiver===true};
+    }finally{db.close();}
   };
   const wake=async(input:PanelRequest,snapshot:Awaited<ReturnType<typeof identity>>)=>{
     const row=commands.get(input.commandId)!;if(!commands.beginWake(row.id,await processStart(process.pid)))return;
@@ -81,6 +93,16 @@ export function startPanel(options:Options){
           if(req.method!=='GET'&&(requestOrigin!==origin||!equal(req.headers.get('x-csrf-token')??'',csrf)))return json({error:'Invalid CSRF token'},403);
           if(url.pathname==='/api/v1/health'&&req.method==='GET')return json({version,csrf,ownerThread:options.ownerThread??null});
           if(url.pathname==='/api/v1/participants'&&req.method==='GET')return json(await discoverParticipants(options.configDir,options.stateDir));
+          if(url.pathname==='/api/v1/project-authorization'&&req.method==='GET'){
+            const id=await authorizationIdentity({ownerThread:url.searchParams.get('ownerThread'),project:url.searchParams.get('project')});
+            return json({...authorizations.status(id.project),chatPolicy:id.chatPolicy,receiverSupported:id.receiverSupported});
+          }
+          if(url.pathname==='/api/v1/project-authorization'&&req.method==='POST'){
+            const change=authorizationChangeSchema.parse(await body(req));
+            const id=await authorizationIdentity({ownerThread:change.ownerThread,project:change.project});
+            if(change.enabled&&!id.receiverSupported)throw new Error('Reload this chat receiver before remembering project authorization');
+            return json({...authorizations.change({...change,project:id.project}),chatPolicy:id.chatPolicy,receiverSupported:id.receiverSupported});
+          }
           if(url.pathname==='/api/v1/presets'&&req.method==='GET')return json(Object.entries(routineGuides).map(([id,guidance])=>({id,guidance})));
           if(url.pathname==='/api/v1/runs'&&req.method==='GET')return json(list());
           if(url.pathname==='/api/v1/commands'&&req.method==='GET'){await commands.inspectApplications();return json(commands.list(options.ownerThread).map(c=>commands.public(c)));}
@@ -122,5 +144,5 @@ export function startPanel(options:Options){
     }});
   return {url:`http://127.0.0.1:${server.port}/#token=${token}`,origin:`http://127.0.0.1:${server.port}`,store,commands,
     async reconcileCommand(id:string){const command=commands.get(id);if(command?.state!=='unknown')return;const inputs=await readDesktopInputs(options.ipcPath,command.owner);if(inputs.consumed.some(i=>i.clientId===command.input_id))commands.consumed(id);},
-    async close(){if(closed)return;closed=true;for(const stop of streams)stop();await server.stop(true);await Promise.allSettled([...wakes]);store.close();commands.close();}};
+    async close(){if(closed)return;closed=true;for(const stop of streams)stop();await server.stop(true);await Promise.allSettled([...wakes]);store.close();commands.close();authorizations.close();}};
 }

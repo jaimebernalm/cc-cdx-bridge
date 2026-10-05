@@ -41,6 +41,7 @@ export async function discoverParticipants(configDir: string, stateDir?: string)
         managedReceiver:peer.entrypoint==='codex-claude-uds-bridge'?managedReceiver(stateDir,peer):null,
         guidedReceiver:peer.entrypoint==='codex-claude-uds-bridge'?managedReceiver(stateDir,peer,'guided_runs_v1'):null,
         structuredReceiver:peer.entrypoint==='codex-claude-uds-bridge'?managedReceiver(stateDir,peer,'structured_runs_v1'):null,
+        projectAuthorizationReceiver:peer.entrypoint==='codex-claude-uds-bridge'?managedReceiver(stateDir,peer,'project_authorization_v1'):null,
         panelReceiver:peer.entrypoint==='codex-claude-uds-bridge'?managedReceiver(stateDir,peer,'panel_commands_v1'):null,
         eligibleSurface: peer.entrypoint === 'codex-claude-uds-bridge' || peer.entrypoint === 'claude-desktop' && claudeVersionSupported(version) });
     } catch { /* Stale or ambiguous metadata is not selectable. */ }

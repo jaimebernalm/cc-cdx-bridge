@@ -341,6 +341,16 @@ export class RunStore {
     const row=this.db.query<{run_id:string},[string]>("SELECT run_id FROM run_messages WHERE transport_id=? AND direction='in'").get(transportId);
     return row?{runId:row.run_id,participants:this.participants(row.run_id)}:null;
   }
+  projectAuthorizationCandidate(transportId:string,owner:string,project:string) {
+    const message=this.db.query<MessageRow,[string]>("SELECT * FROM run_messages WHERE transport_id=? AND direction='in'").get(transportId);
+    if(!message||!message.admitted||!message.reply_to)return null;
+    const run=this.expire(message.run_id),observation=this.coordination.observation(message.id);
+    if(run.owner_thread!==owner||!['active','paused','blocked','recovery_required'].includes(run.state))return null;
+    if(this.coordination.row(run.id)&&observation?.classification!=='valid')return null;
+    const participants=this.participants(run.id);
+    if(!participants.every(p=>p.project.directory===project)||!participants.some(p=>p.provider==='codex'&&p.sessionId===owner)||!participants.some(p=>p.provider==='claude'&&p.sessionId===message.peer_id))return null;
+    return {receivedAt:message.created_at};
+  }
   participantEnded(threadId: string) { const id=this.activeFor(threadId); if (id) this.block(id,'participant_unavailable'); }
   recordNotice(threadId: string, peer: Peer, transportId: string, text: string) {
     const id=this.activeFor(threadId); if (!id) return false;
