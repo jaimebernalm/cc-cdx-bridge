@@ -2,9 +2,9 @@
 
 ## Punto de recuperación
 
-Autorizado: planificar, implementar, instalar y probar el panel. Rama `feature/phase-4-local-panel`, desde main `d1ab650` (PR #2 y #3 fusionadas). No publicar PR ni fusionar sin instrucción nueva. No cambiar permisos/recepción. No crear chats de prueba. Preservar los chats Desktop elegidos y datos existentes.
+Autorizado: implementar y probar el panel; crear y usar el chat real de prueba; recordar la autorización para este proyecto (elección expresa del usuario); preparar, revisar y fusionar la PR de fase 4 y después abrir una rama `feature/` para fase 5. Preservar los ajustes propios de ambos chats y los ajustes de Claude. Rama `feature/phase-4-local-panel`, desde main `d1ab650` (PR #2 y #3 fusionadas).
 
-Estado: implementación completada y validada localmente el 4 de octubre de 2026. Distribución 0.6.0 instalada. Rama pendiente de revisión/publicación; arranque desde chat real idle confirmado; retorno de Claude al nuevo chat detenido por su recepción default. Matriz ampliada de piloto pendiente. `.local/phase4` contiene evidencia privada, no se publica.
+Estado: fase 4 completada y validada localmente, distribución 0.6.1 instalada. El ensayo final confirma arranque desde chat real idle y retorno de Claude mediante herencia del proyecto, conservando recepción `default`. Suite final: 127 pruebas/969 aserciones tanto fuente como bundles. La matriz ampliada de piloto pertenece a fase 5. Evidencia privada en `.local/phase4`, fuera de la PR.
 
 ## Diseño y decisiones
 
@@ -98,3 +98,12 @@ Implementada en la misma rama. Plan de continuidad y alcance: [PROJECT_AUTHORIZA
 Validación: 126 pruebas/962 aserciones, cero fallos, tanto fuente como bundles; incluye persistencia, alias, recreación de carpetas, aislamiento, revocación incluso tras barrera, prioridad de hold/refuse, tráfico ordinario/contexto obsoleto, protección HTTP y repetición de acciones antiguas. Navegador con fixture aislada: activar → Recordada → recargar → Recordada → revocar → No recordada. Se comprobó vista móvil de 420 px sin desbordamiento. Instalación aislada 0.6.1 validada y plugin habitual actualizado.
 
 Los receptores reales de este chat y del ensayo idle se recargaron solo después de verificar proyecto nativo y ausencia de reservas/entregas pendientes. Mantienen respectivamente `accept` y `default`, con `project_authorization_v1` anunciado; ajustes Claude idénticos. El panel compilado actualizado está abierto con el proyecto real, en Autorización, mostrando No recordada. No se activó un permiso real ni se repitió la respuesta denegada: corresponde al usuario confirmar su elección desde la UI. El nuevo panel visible se sirve mediante CLI local; tras reiniciar MCP, `collaboration_panel` abrirá la versión instalada 0.6.1.
+
+## Cierre de fase 4 antes de la PR
+
+- Revisión del código: corregida una carrera entre aceptación y entrada a entrega; ahora se conserva el requisito de revalidar la recepción tras las esperas nativas, aunque otro proceso revoque antes de entrar a `deliver`. Prueba determinista de regresión incluida.
+- Suite final fuente y bundles: 127 pruebas, cero fallos, 969 aserciones. Tipos backend/UI y compilación correctos.
+- Ensayo real final: autorización activada desde UI por elección expresa del usuario y conservada; chat nativo idle antes del botón Iniciar. Orden durable aplicada y clientId consumido exactamente una vez. Codex conserva `default` durante todo el ensayo. Claude respondió con revisión de la versión/hash exactos, nonce y suma correctos; respuesta correlacionada válida, autorizada y consumida por el chat. Cierre completed, dos mensajes de cuatro, cero tareas pendientes y reservas liberadas. Ajustes Claude byte a byte iguales.
+- La revisión agree es una declaración atribuida, no consenso certificado ni auditoría general del puente. La evidencia anterior de retorno denegado permanece histórica, resuelta para este alcance por el permiso de proyecto. No se liberó ni reenvió aquel mensaje.
+- Evidencia privada: `project-auth-real-before.json`, `project-auth-real-evidence.json`, `project-auth-real-export.json`, `project-auth-recorded.png`, `project-auth-real-result.png`. No publicar IDs, tokens ni configuración local.
+- Fase 5 queda pendiente: reinicios/actualizaciones, varias sesiones, worktrees, matriz completa de piloto y distribución. No crear un servicio permanente ni comenzar esos cambios al abrir su rama.
