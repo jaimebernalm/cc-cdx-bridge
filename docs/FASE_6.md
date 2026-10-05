@@ -2,7 +2,7 @@
 
 ## Estado y continuidad
 
-Rama `feature/phase-6-coordinated-work`, creada desde `d8cad65` de fase 5, aún sin fusionar. No fusionar ni publicar automáticamente las fases. Fase 5 tiene un Claude temporal pendiente de archivado al desbloquear el Mac; esa limpieza no cambia el alcance de fase 6.
+Rama `feature/phase-6-coordinated-work`, creada desde `d8cad65` de fase 5. El usuario autorizó la entrega de ambas fases: fase 5 se fusionó mediante [PR #6](https://github.com/jaimebernalm/cc-cdx-bridge/pull/6) y [PR #5](https://github.com/jaimebernalm/cc-cdx-bridge/pull/5) se cambió a `main` para entregar fase 6. La preparación de un candidato no publica automáticamente. Fase 5 tiene un Claude temporal inactivo pendiente de archivado; esa limpieza no cambia el alcance de fase 6.
 
 El usuario pidió planificar, explorar, implementar y corregir durante las pruebas. Este documento es el punto de recuperación de contexto. Revisar `git status`, esta lista y los logs privados antes de continuar; conservar cambios ajenos. No crear nuevos chats ni cambiar permisos para conseguir pruebas. No sustituir modelos Desktop por modelos CLI.
 
@@ -109,6 +109,6 @@ Logs/transcriptos bajo `.local/phase6/`, fuera de Git. No copiar tokens, IDs pri
 
 El piloto acredita cooperación con escritura en worktrees separados en este entorno macOS; no demuestra que ambos modelos razonaran o editaran exactamente al mismo tiempo, ni mejora universal frente a un agente. Los fixtures cubren conflictos y límites difíciles de reproducir; no se presentan como modelos reales. El núcleo verifica integridad, alcance y vigencia, pero no ejecuta tests ni valida el rigor del veredicto. CI Linux/macOS de fase 5 no acredita automáticamente el código nuevo de fase 6; la siguiente PR deberá ejecutar su propia CI.
 
-Preparar integración no crea PR, hace merge, commit de resultados de usuario ni publica automáticamente. La PR de esta fase usa `feature/phase-5-pilot-hardening` como base porque fase 5 sigue sin fusionar; su diff aísla fase 6. Después de entregar fase 5, cambiar la base a `main` y comprobar de nuevo el diff y la CI antes de fusionar. Los logs, tokens, transcriptos y screenshots del ensayo permanecen fuera de Git.
+Preparar integración no crea PR, hace merge, commit de resultados de usuario ni publica automáticamente. La PR de esta fase se abrió sobre `feature/phase-5-pilot-hardening` para aislar el diff, y se cambió a `main` tras fusionar fase 5 conservando sus commits. Se comprobó que el diff sigue aislando fase 6 y que el árbol de la integración coincide con el de la candidata probada. Los logs, tokens, transcriptos y screenshots del ensayo permanecen fuera de Git.
 
-La candidata local está instalada y el panel nativo ha sido probado. El usuario ha solicitado preparar y abrir la PR; esa entrega conserva la dependencia de fase 5 y requiere su propia CI. No borrar los worktrees del piloto sin preservar su trabajo y evidencia.
+La candidata local está instalada y el panel nativo ha sido probado. El usuario ha autorizado la fusión; la entrega exige comprobar la CI del commit final sobre `main`. No borrar los worktrees del piloto sin preservar su trabajo y evidencia.
