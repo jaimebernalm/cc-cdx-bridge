@@ -125,6 +125,8 @@ Se conservaron seis órdenes anteriores, el run L03 finalizado, el run L10 cance
 
 Durante esta comprobación se observó un defecto visual: el aviso de control conservaba «Activando el chat» después de aplicar la orden. Se cambia para derivar su texto del estado actual de la misma orden persistida, sin modificar entrega, controles ni permisos. Regresión visual aislada pasó: pausa, reanudación y cancelación mostraron transición de «Activando» a «Aplicada» para su orden exacta. Fixture detenido y pestaña cerrada. Tipos backend/UI y build UI pasan; bundle instalado coincide con los seis archivos backend/UI finales, panel real recargado. Capturas privadas `ui-notice-applied.png` y `ui-notice-cancelled.png`. No se añadieron mensajes a modelos ni se cambiaron permisos en este fixture.
 
+CI Linux/macOS del arreglo visual final aprobada sobre `9c474c7`: [ejecución 37258885042](https://github.com/jaimebernalm/cc-cdx-bridge/actions/runs/37258885042). Incluye tipos backend/UI, suite fuente y suite bundle; Linux también comprueba bundles comprometidos contra fuente. Cambios posteriores de este checkpoint son solo documentación.
+
 Pendientes y reglas de continuación:
 
 1. L06/L17 necesitan crear chats temporales de Codex/Claude; hay una pregunta asíncrona pendiente para autorizarlos y archivarlos después. «Listo» confirma la reapertura solicitada, no concede aquella autorización distinta. No crear chats hasta recibir respuesta explícita.
