@@ -25,6 +25,8 @@ jobs:
           bun-version: '1.4.2'
 
       - run: bun install --frozen-lockfile
+      - run: cd ui && bun install --frozen-lockfile
+      - run: cd ui && bunx tsc --noEmit
       - run: bun run check
       - run: bun test
 
@@ -35,7 +37,7 @@ jobs:
         run: |
           set -eu
           bun run build
-          git diff --exit-code -- dist || {
+          git diff --exit-code -- dist panel-dist || {
             echo "::error::dist is stale. Run 'bun run build' and commit the result."
             exit 1
           }

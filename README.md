@@ -1,6 +1,6 @@
 # CC–CDX Bridge
 
-Fork maintained at [jaimebernalm/cc-cdx-bridge](https://github.com/jaimebernalm/cc-cdx-bridge), based on [Leon Kohli's Claude UDS Bridge](https://github.com/LeonKohli/claude-uds-bridge). Version 0.5.0 adds optional structured coordination: versioned context/tasks, an initial exchange barrier, pause/resume, controller leases, crash recovery and exact-version review coverage. It retains the 0.4.1 protocol corrections for encoded socket addresses, native alternate socket names, priorities, receipt reasons and explicit attachment refusal, alongside private logs, budgets and reception settings. The barrier withholds current-run analyses; it does not erase chat history. A shared UI remains planned. See [phase 3](docs/FASE_3.md), [phase 2](docs/FASE_2.md) and the [compatibility and reception decision](docs/COMPATIBILIDAD.md).
+Fork maintained at [jaimebernalm/cc-cdx-bridge](https://github.com/jaimebernalm/cc-cdx-bridge), based on [Leon Kohli's Claude UDS Bridge](https://github.com/LeonKohli/claude-uds-bridge). Version 0.6.0 adds an authenticated local shadcn/ui panel to create, follow, control and export collaborations through the selected Desktop chat's real tools. It retains the optional structured coordination from 0.5.0 and the 0.4.1 transport corrections. The initial barrier withholds current-run analyses; it does not erase chat history. Reviews are attributed declarations, never certified consensus. See [phase 4](docs/FASE_4.md), [phase 3](docs/FASE_3.md) and the [compatibility and reception decision](docs/COMPATIBILIDAD.md).
 
 A Codex plugin that lets Codex tasks and Claude Code sessions message each other on one machine.
 
@@ -192,3 +192,23 @@ The Claude transport follows the [socket protocol documented by PeterSR](https:/
 MIT. See [LICENSE](LICENSE).
 
 Original work: Leon Kohli. The transport client type, MCP server key, peer entrypoint and state directory remain `claude-uds-bridge` for compatibility. The fork uses marketplace `jaimebernalm`; do not enable both distributions for the same chat. Installing this fork does not automatically remove the upstream plugin or migrate its trust decision.
+
+## Panel local (fase 4)
+
+Desde el chat Codex con el plugin 0.6.0, pide abrir el panel (`collaboration_panel`). Devuelve un enlace privado de localhost. También puedes iniciar el servicio bajo demanda:
+
+```bash
+/bin/sh scripts/run-bun.sh dist/cli.js panel
+```
+
+Ejecuta el comando desde la carpeta del plugin; `--thread UUID` limita el panel a un chat. El panel permite seleccionar conversaciones Desktop, empezar análisis nuevos o pegar análisis existentes, seguir el intercambio, leer resultados y desacuerdos, exportar Markdown/JSON y solicitar pausa/reanudación/cancelación. Las órdenes se guardan y las aplica el chat propietario con sus herramientas reales. Cierra el proceso con Ctrl+C cuando ya no lo necesites. No se instala un servicio permanente.
+
+Tras actualizar, salir completamente de Codex y volver al mismo chat carga las herramientas nuevas. El panel muestra un requisito de recarga si el receptor aún es antiguo. Un receptor vivo puede sobrevivir a la recarga de la app: en ese caso, pide recargar solo el receptor de ese chat, después de comprobar que no hay colaboraciones activas ni entradas pendientes. El arranque normal lo reutiliza; no lo sustituye automáticamente. No modifica la recepción de Claude ni permisos de ejecución. Los mensajes privados retenidos detrás de la barrera siguen ocultos. Si una aplicación queda interrumpida o la entrega es incierta, muestra diagnóstico; no repite trabajo automáticamente.
+
+Para desarrollar la UI: `cd ui && bun install --frozen-lockfile`; el build del plugin genera backend y `panel-dist/`. La UI utiliza componentes oficiales shadcn/ui obtenidos mediante su MCP; no necesita ese MCP en el entorno de uso.
+
+### Recordar recepción por proyecto
+
+En el panel local, abre **Autorización** (también aparece al crear una colaboración), selecciona el chat y pulsa **Recordar autorización para este proyecto → Confirmar autorización**. La elección se guarda y los chats Codex nuevos con recepción `default` pueden heredarla. Puedes revocarla en el mismo lugar.
+
+El alcance es la carpeta exacta: solo futuras respuestas correlacionadas del participante Claude verificado en colaboraciones gestionadas de esa carpeta. Otro worktree requiere su propia elección. Los ajustes explícitos `accept`, `hold` o `refuse` de un chat tienen prioridad; revocar la herencia no cambia su `accept` propio. No se liberan mensajes antiguos ni se cambian los permisos de ejecución/edición o la recepción de Claude. Los receptores anteriores a 0.6.1 necesitan recargarse; el panel muestra su compatibilidad.

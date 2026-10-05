@@ -8,6 +8,7 @@ import { z } from 'zod';
 import { outboundServer, refreshReceiver, sendViaReceiver } from './outbound';
 import { PeerGuard } from './guard';
 import { RunStore } from './runs';
+import { ProjectAuthorizations } from './project-authorization';
 import { inspectParticipant, matchesProcess, sameSnapshot } from './participants';
 
 type Message = { id: string; peer_id: string; direction: string; text: string; status: string; turn_id: string | null;
@@ -20,6 +21,7 @@ const subscriptionLifetime = 12 * 60 * 60 * 1000;
 
 export class Bridge {
   readonly runs: RunStore;
+  private authorizations: ProjectAuthorizations;
   private db: Database;
   private guard: PeerGuard;
   private listener?: Awaited<ReturnType<typeof inbox>>;
@@ -36,6 +38,7 @@ export class Bridge {
     mkdirSync(stateDir, { recursive: true, mode: 0o700 });
     privateDirectory(stateDir);
     this.runs = new RunStore(stateDir);
+    this.authorizations = new ProjectAuthorizations(stateDir);
     const path = join(stateDir, `${threadId}.sqlite`);
     this.db = new Database(path, { create: true, strict: true });
     chmodSync(path, 0o600);
@@ -163,6 +166,8 @@ export class Bridge {
         this.db.run("INSERT INTO receiver_capabilities VALUES ('managed_runs_v1',?,?)",[process.pid,procStart]);
         this.db.run("INSERT INTO receiver_capabilities VALUES ('guided_runs_v1',?,?)",[process.pid,procStart]);
         this.db.run("INSERT INTO receiver_capabilities VALUES ('structured_runs_v1',?,?)",[process.pid,procStart]);
+        this.db.run("INSERT INTO receiver_capabilities VALUES ('panel_commands_v1',?,?)",[process.pid,procStart]);
+        this.db.run("INSERT INTO receiver_capabilities VALUES ('project_authorization_v1',?,?)",[process.pid,procStart]);
       })();
       this.ownsReceiver = true;
       this.db.run("UPDATE messages SET status='unknown' WHERE status='submitting'");
@@ -395,16 +400,28 @@ export class Bridge {
     return expiry === 'never' ? null : Date.now() + { '60s': 60000, '5m': 300000, '10m': 600000 }[expiry];
   }
 
+  private projectAllows(message:Message) {
+    if(message.kind!=='message')return false;
+    const cwd=peers(this.configDir).find(p=>p.sessionId===this.threadId&&p.entrypoint==='codex-claude-uds-bridge')?.cwd;
+    if(!cwd)return false;
+    try {
+      const project=this.authorizations.status(cwd).project;
+      const candidate=this.runs.projectAuthorizationCandidate(message.id,this.threadId,project);
+      return !!candidate&&this.authorizations.allows(project,candidate.receivedAt);
+    }catch{return false;}
+  }
+
   private decision(message: Message): Exclude<Policy, 'default'> {
     const policy = this.policy();
     if (policy !== 'default') return policy;
+    if(this.projectAllows(message))return 'accept';
     const mode = this.runtime().mode;
     return mode !== 'unknown' && (message.from_mode === mode || (mode === 'prompting' && message.from_mode === null)) ? 'accept' : 'hold';
   }
 
   private async route(message: Message) {
     const decision = this.decision(message);
-    if (decision === 'accept') { await this.deliver(message); return; }
+    if (decision === 'accept') { await this.deliver(message, true); return; }
     if (message.kind === 'idle-notice') {
       this.db.run("UPDATE messages SET status=?,text='' WHERE id=? AND status='pending'",
         [decision === 'hold' ? 'recorded' : 'refused', message.id]);
@@ -598,7 +615,10 @@ export class Bridge {
     catch { return peer_id; }
   }
 
-  private async deliver(message: Message) {
+  private async deliver(message: Message, recheckPolicy=false) {
+    // Capture the routing requirement, not a second observation of a grant:
+    // another process can revoke between route() and this entry point.
+    const checkPolicy=recheckPolicy||message.status==='buffered';
     if(message.status==='buffered'&&this.decision(message)!=='accept'){this.db.run("UPDATE messages SET status='pending' WHERE id=? AND status='buffered'",[message.id]);await this.route(message);return;}
     if(message.kind==='message'){const gate=this.runs.authorizeIncoming(message.id);
       if(gate==='buffer'){this.db.run("UPDATE messages SET status='buffered' WHERE id=? AND status IN ('pending','held','buffered')",[message.id]);return;}
@@ -627,15 +647,7 @@ export class Bridge {
     }).immediate();
     if (claim === 'unchanged') return;
     if (claim === 'full') { await this.receipt(message, 'dropped', 'queue-full'); return; }
-    if (message.kind === 'message') {
-      const body = /^<cross-session-message\s[^>]*>\n([\s\S]*)\n<\/cross-session-message>$/.exec(message.text)?.[1] ?? message.text;
-      const reason = this.guard.admit(`${message.peer_address}:${message.peer_start ?? ''}`, body, hopChain(message.text), this.ownHop());
-      if (reason) {
-        this.db.run("UPDATE messages SET status='dropped',drop_reason=?,awaiting_input=0 WHERE id=?", [reason, message.id]);
-        await this.receipt(message, 'dropped', reason);
-        return;
-      }
-    }
+
     try {
       const managed=this.runs.incomingParticipants(message.id);
       if (managed) {
@@ -646,6 +658,20 @@ export class Bridge {
           this.runs.block(managed.runId,'participant_or_project_changed');
           this.db.run("UPDATE messages SET status='dropped',drop_reason='participant-or-project-changed',awaiting_input=0 WHERE id=?",[message.id]);
           await this.receipt(message,'dropped','participant-or-project-changed'); return;
+        }
+      }
+      // Recheck after native/project inspection: revocation must cover queued deliveries.
+      if(checkPolicy&&this.decision(message)!=='accept') {
+        this.db.run("UPDATE messages SET status='pending',awaiting_input=0,desktop_input_id=NULL WHERE id=? AND status='submitting'",[message.id]);
+        await this.route(message);return;
+      }
+      if (message.kind === 'message') {
+        const body = /^<cross-session-message\s[^>]*>\n([\s\S]*)\n<\/cross-session-message>$/.exec(message.text)?.[1] ?? message.text;
+        const reason = this.guard.admit(`${message.peer_address}:${message.peer_start ?? ''}`, body, hopChain(message.text), this.ownHop());
+        if (reason) {
+          this.db.run("UPDATE messages SET status='dropped',drop_reason=?,awaiting_input=0 WHERE id=?", [reason, message.id]);
+          await this.receipt(message, 'dropped', reason);
+          return;
         }
       }
       if (!this.runs.claimIncoming(message.id)) {
@@ -699,6 +725,7 @@ export class Bridge {
     await withdraw();
     this.db.close();
     this.runs.close();
+    this.authorizations.close();
   }
 
   private async finishSession(address: string) {

@@ -53,3 +53,7 @@ Claude sends that full text via its native `SendMessage` to the indicated Codex 
 - `collaboration_export`: `{runId,format:"markdown"|"json"}`. Returns text; no automatic write/publication. Transcript includes verified author IDs and private paths, so review before sharing.
 
 When a process/project revision changes, close/cancel and prepare again; don't follow a replacement conversation by similar name. When the core reports uncertain delivery, read state and request the human's needed decision rather than sending a duplicate task. Runs without coordination keep frozen context version 1. For versioned tasks/context, leases and recovery see [structured.md](structured.md).
+
+## Phase 4 panel
+
+`collaboration_panel {}` returns a private authenticated loopback URL for the caller-owned panel. `collaboration_panel_command {commandId}` reads/applies only that persisted human action using real caller metadata. See [panel.md](panel.md) for notification handling, lease/idempotency and reload limitations. No arbitrary ownerThread is accepted by either MCP operation.

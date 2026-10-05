@@ -28,7 +28,7 @@ export async function doctor(options: DoctorOptions) {
   try {
     const manifest = ownedJson(join(options.pluginRoot, '.codex-plugin', 'plugin.json'), 65536) as { name: string; version: string };
     if (manifest.name !== 'claude-uds-bridge' || manifest.version !== version) throw new Error('Manifest mismatch');
-    for (const file of ['dist/server.js', 'dist/hook.js', 'dist/cli.js', 'scripts/run-bun.sh', 'skills/bridge-collaboration/SKILL.md', 'skills/bridge-collaboration/references/api.md']) {
+    for (const file of ['dist/server.js', 'dist/hook.js', 'dist/cli.js', 'panel-dist/index.html', 'scripts/run-bun.sh', 'skills/bridge-collaboration/SKILL.md', 'skills/bridge-collaboration/references/api.md']) {
       if (!existsSync(join(options.pluginRoot, file))) throw new Error(`Missing ${file}`);
     }
     add('distribution', 'ok', `cc-cdx-bridge ${manifest.version}; marketplace jaimebernalm; transport identity retained.`);
