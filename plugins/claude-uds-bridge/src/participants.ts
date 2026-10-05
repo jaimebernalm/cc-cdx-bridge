@@ -8,7 +8,7 @@ import { inspectProject, type ProjectIdentity } from './project';
 
 export type Participant = {
   sessionId: string; name: string; provider: 'codex' | 'claude'; surface: string; pid: number;
-  procStart: string; socketPath: string; version: string | null; status: string; project: ProjectIdentity;
+  implementationReceiver?: boolean | null; procStart: string; socketPath: string; version: string | null; status: string; project: ProjectIdentity;
 };
 export type ParticipantOptions = { configDir: string; stateDir: string; ipcPath: string };
 
@@ -42,6 +42,7 @@ export async function discoverParticipants(configDir: string, stateDir?: string)
         guidedReceiver:peer.entrypoint==='codex-claude-uds-bridge'?managedReceiver(stateDir,peer,'guided_runs_v1'):null,
         structuredReceiver:peer.entrypoint==='codex-claude-uds-bridge'?managedReceiver(stateDir,peer,'structured_runs_v1'):null,
         projectAuthorizationReceiver:peer.entrypoint==='codex-claude-uds-bridge'?managedReceiver(stateDir,peer,'project_authorization_v1'):null,
+        implementationReceiver:peer.entrypoint==='codex-claude-uds-bridge'?managedReceiver(stateDir,peer,'implementation_v1'):null,
         panelReceiver:peer.entrypoint==='codex-claude-uds-bridge'?managedReceiver(stateDir,peer,'panel_commands_v1'):null,
         eligibleSurface: peer.entrypoint === 'codex-claude-uds-bridge' || peer.entrypoint === 'claude-desktop' && claudeVersionSupported(version) });
     } catch { /* Stale or ambiguous metadata is not selectable. */ }
@@ -73,6 +74,7 @@ export async function inspectParticipant(options: ParticipantOptions, id: string
   }
   return { sessionId: id, name: peer.name, provider, surface: peer.entrypoint!, pid: peer.pid,
     procStart: peer.procStart!, socketPath: peer.messagingSocketPath, version, status: peer.status,
+    implementationReceiver:provider==='codex'?managedReceiver(options.stateDir,peer,'implementation_v1'):null,
     project: await inspectProject(peer.cwd) };
 }
 
@@ -86,4 +88,10 @@ export function sameSnapshot(first: Participant, second: Participant) {
   return first.sessionId === second.sessionId && first.pid === second.pid && first.procStart === second.procStart
     && first.socketPath === second.socketPath && first.surface === second.surface && first.version === second.version
     && JSON.stringify(first.project) === JSON.stringify(second.project);
+}
+
+// A write contract relaxes dirty fingerprints only for its registered workspaces.
+export function sameScopedSnapshot(a:Participant,b:Participant,plan:import('./implementation').ImplementationPlan|null){
+ if(!plan?.workspaces.some(w=>w.root===a.project.worktree))return sameSnapshot(a,b);
+ return a.sessionId===b.sessionId&&a.provider===b.provider&&a.pid===b.pid&&a.procStart===b.procStart&&a.socketPath===b.socketPath&&a.surface===b.surface&&a.version===b.version&&a.project.directory===b.project.directory&&a.project.worktree===b.project.worktree&&a.project.commonGitDir===b.project.commonGitDir&&a.project.head===b.project.head;
 }

@@ -20,10 +20,13 @@ async function readLimited(stream: ReadableStream<Uint8Array>, limit = 16 * 1024
   } finally { reader.releaseLock(); }
 }
 
-async function git(directory: string, args: string[]) {
-  const child = Bun.spawn(['git', '-c', 'core.fsmonitor=false', '-C', directory, ...args], {
-    env: { ...process.env, LC_ALL:'C', GIT_OPTIONAL_LOCKS: '0', GIT_TERMINAL_PROMPT: '0' }, stdout: 'pipe', stderr: 'pipe',
+export async function git(directory: string, args: string[], extraEnv: Record<string,string> = {}, input?: string) {
+  // Do not inherit Git overrides that redirect repository/index identity.
+  const inherited=Object.fromEntries(Object.entries(process.env).filter(([name])=>!name.startsWith('GIT_')));
+  const child = Bun.spawn(['git', '-c', 'core.hooksPath=/dev/null', '-c', 'core.fsmonitor=false', '-C', directory, ...args], {
+    env: { ...inherited, LC_ALL:'C', GIT_OPTIONAL_LOCKS: '0', GIT_TERMINAL_PROMPT: '0', ...extraEnv }, stdin: input===undefined?'ignore':'pipe', stdout: 'pipe', stderr: 'pipe',
   });
+  if(input!==undefined && child.stdin){child.stdin.write(input);child.stdin.end();}
   const timer = setTimeout(() => child.kill(), 10000);
   try {
     const [code, output, error] = await Promise.all([child.exited, readLimited(child.stdout), readLimited(child.stderr, 65536)]);

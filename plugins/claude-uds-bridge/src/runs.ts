@@ -10,6 +10,7 @@ import { normalizeRoutine, type RoutineInput, type Task, type Report, type Closu
 import { RoutineLedger } from './routine-ledger';
 import { Coordination, type CoordinationInput, type Control } from './coordination';
 import { parseWork } from './routines';
+import {ImplementationLedger,captureImplementation,previewIntegration,implementationActionSchema,type ImplementationPlan,type ImplementationAction} from './implementation';
 
 export const contextSchema = z.object({ objective: z.string().trim().min(1).max(16000),
   constraints: z.array(z.string().max(4000)).max(50).default([]), references: z.array(z.string().max(4000)).max(50).default([]),
@@ -29,7 +30,10 @@ export class RunStore {
   private db: Database;
   private ledger: RoutineLedger;
   private coordination: Coordination;
+  private implementation: ImplementationLedger;
+  private stateDir: string;
   constructor(stateDir: string, private now = () => Date.now()) {
+    this.stateDir=stateDir;
     mkdirSync(stateDir, { recursive: true, mode: 0o700 }); privateDirectory(stateDir);
     const path = join(stateDir, 'collaborations.sqlite');
     if (existsSync(path)) {
@@ -63,8 +67,9 @@ export class RunStore {
         actor TEXT NOT NULL, at INTEGER NOT NULL, payload TEXT NOT NULL
       );
       `);
-    this.db.transaction(() => { RoutineLedger.install(this.db); Coordination.install(this.db); this.db.exec('PRAGMA user_version=3'); }).immediate();
+    this.db.transaction(() => { RoutineLedger.install(this.db); Coordination.install(this.db); ImplementationLedger.install(this.db); this.db.exec('PRAGMA user_version=3'); }).immediate();
     this.ledger = new RoutineLedger(this.db,(...args)=>this.event(...args),this.now);
+    this.implementation=new ImplementationLedger(this.db,this.now);
     this.coordination = new Coordination(this.db,this.now,(...args)=>this.event(...args));
   }
   close() { this.db.close(); }
@@ -133,13 +138,14 @@ export class RunStore {
     this.block(id, 'participant_session_changed');
     return true;
   }
-  prepare(owner: string, requestId: string, context: Context, limits: Limits, participants: Participant[], comparison: unknown, routine?: RoutineInput, coordination?: CoordinationInput) {
+  prepare(owner: string, requestId: string, context: Context, limits: Limits, participants: Participant[], comparison: unknown, routine?: RoutineInput, coordination?: CoordinationInput, implementation?: ImplementationPlan) {
     uuid.parse(owner); uuid.parse(requestId); context = contextSchema.parse(context); limits = limitsSchema.parse(limits);
     const normalized = normalizeRoutine(routine,context.priorAnalysis);
+    if(implementation&&!coordination)throw new Error('Implementation requires structured coordination');
     if(coordination?.initialBarrier && normalized.startMode!=='new')throw new Error('Initial barrier requires new/new starts');
     if (participants.length !== 2 || participants.filter(p=>p.provider==='codex' && p.sessionId===owner).length !== 1
       || participants.filter(p=>p.provider==='claude').length !== 1 || participants[0]!.sessionId===participants[1]!.sessionId) throw new Error('A collaboration requires the caller Codex and one distinct Claude participant');
-    const requestHash = digest({owner,context,limits,participants:participants.map(p=>({...p,status:undefined,name:undefined})),comparison,routine:normalized,coordination});
+    const requestHash = digest({owner,context,limits,participants:participants.map(p=>({...p,status:undefined,name:undefined})),comparison,routine:normalized,coordination,...(implementation?{implementation}:{})});
     return this.db.transaction(() => {
       const existing = this.db.query<RunRow, [string]>('SELECT * FROM runs WHERE request_id=?').get(requestId);
       if (existing) { if (existing.request_hash !== requestHash || existing.owner_thread !== owner) throw new Error('Preparation request ID was reused with different content'); return existing.id; }
@@ -147,7 +153,7 @@ export class RunStore {
       this.db.run("INSERT INTO runs (id,owner_thread,request_id,request_hash,state,context,limits,comparison,created_at) VALUES (?,?,?,?,'prepared',?,?,?,?)",
         [id,owner,requestId,requestHash,JSON.stringify(context),JSON.stringify(limits),JSON.stringify(comparison),this.now()]);
       for (const peer of participants) this.db.run('INSERT INTO participants VALUES (?,?,?,?)',[id,peer.provider,peer.sessionId,JSON.stringify(peer)]);
-      this.ledger.prepare(id,normalized);this.coordination.prepare(id,coordination,context);
+      this.ledger.prepare(id,normalized);this.coordination.prepare(id,coordination,context);this.implementation.prepare(id,implementation);
       this.event(id,'prepared',owner,{contextVersion:1,reception:'unknown',mode:'supervised'}); return id;
     }).immediate();
   }
@@ -363,6 +369,7 @@ export class RunStore {
     if(!this.ledger.existing(id,owner,reportId,report,text))this.coordination.guard(id);
     return this.db.transaction(()=>{const existing=this.ledger.existing(id,owner,reportId,report,text);if(existing)return existing;
       this.coordination.fence(id);const run=this.expire(id);if(run.state!=='active')throw new Error(`Cannot record a report in a ${run.state} run`);
+      const candidate=this.implementation.candidate(id);if(report.kind==='result'&&candidate?.resultId===report.resultId&&candidate.reportId!==reportId)throw new Error('Implementation result versions must come from a captured candidate');
       this.coordination.validate(id,owner,this.coordination.version(id),report);
       const result=this.ledger.record(id,owner,reportId,report,text);this.coordination.complete(id,owner,reportId,report);this.publishBarrierReports(id);return result;}).immediate();
   }
@@ -422,13 +429,52 @@ export class RunStore {
         contextVersion:this.coordination.version(id), coordination, pendingTasks:coordination?.tasks.filter(t=>t.state==='assigned').map(t=>t.id)??[], context:JSON.parse(row.context) as Context, limits:JSON.parse(row.limits) as Limits,
         comparison:JSON.parse(row.comparison), reception:'unknown', mode:'supervised', createdAt:row.created_at,
         startedAt:row.started_at, deadline:row.deadline, messagesUsed:row.messages_used, participants:this.participants(id),
-        ...ledger,
+        ...ledger, implementation:this.implementation.status(id),
         messages:messages.map(message=>{
           const visible=message.direction==='out'||(!!message.admitted && !!message.delivery_claimed && ['started','steered','delivered','consumed'].includes(message.status));
           return {...message,evidence:this.coordination.observation(message.id),text:visible?message.text:null,wire_text:visible?message.wire_text:null,contentRedacted:!visible,observation:['reserved','submitting'].includes(message.status)?'delivery_uncertain':message.status};
         }),
         events:this.db.query<{sequence:number;type:string;actor:string;at:number;payload:string},[string]>('SELECT sequence,type,actor,at,payload FROM events WHERE run_id=? ORDER BY sequence').all(id)
           .map(event=>({...event,payload:JSON.parse(event.payload)})) };
+    }).immediate();
+  }
+  implementationPlan(id:string){this.row(id);return this.implementation.plan(id);}
+  implementationMaterial(id:string,resultId:string,version:number){return this.implementation.candidateFor(id,resultId,version);}
+  async inspectImplementation(id:string,owner:string){
+    this.assertOwner(id,owner);const status=this.status(id,owner),implementation=this.implementation.status(id);
+    if(!implementation)throw new Error('No implementation contract in this run');
+    const candidate=implementation.candidate;const reasons:string[]=[];let integration:{clean:boolean;patch:string|null;error:string|null}|null=null;
+    if(!candidate)return {...implementation,ready:false,reasons:['No candidate captured'],integration};
+    try{const fresh=await captureImplementation(implementation.plan,status.contextVersion);if(fresh.contentHash!==candidate.contentHash)reasons.push('Workspace or context changed after capture');}
+    catch(error){reasons.push(error instanceof Error?error.message:'Workspace inspection failed');}
+    const checks=implementation.checks.filter(c=>c.candidateHash===candidate.contentHash);
+    for(const name of implementation.plan.requiredChecks){const latest=checks.filter(c=>c.name===name).at(-1);if(!latest||latest.exitCode!==0)reasons.push('Missing or failed declared check: '+name);}
+    const review=status.reviews.filter(r=>r.current&&r.contextVersion===status.contextVersion&&r.author!==owner&&r.report.kind==='review'&&r.report.resultId===candidate.resultId&&r.report.version===candidate.version).at(-1);
+    if(!review||review.report.kind!=='review'||review.report.verdict!=='agree')reasons.push('Missing accepted review from the other agent for this exact candidate');
+    if(!candidate.snapshots.some(s=>s.patch))reasons.push('Candidate has no changes');
+    if(!reasons.some(r=>r.includes('changed')||r.includes('scope')||r.includes('identity'))){try{integration=await previewIntegration(implementation.plan,candidate,this.stateDir);if(!integration.clean)reasons.push('Integration conflict: '+integration.error);}catch(error){reasons.push(error instanceof Error?error.message:'Integration inspection failed');}}
+    // Disk and review checks are asynchronous. Fence against changes during preparation.
+    try{if((await captureImplementation(implementation.plan,status.contextVersion)).contentHash!==candidate.contentHash)reasons.push('Workspace changed during inspection');}catch(error){reasons.push(error instanceof Error?error.message:'Workspace recheck failed');}
+    const after=this.status(id,owner);if(after.contextVersion!==status.contextVersion||this.implementation.candidate(id)?.version!==candidate.version||digest(after.reviews)!==digest(status.reviews)||digest(this.implementation.status(id)?.checks)!==digest(implementation.checks))reasons.push('Candidate, context or evidence changed during inspection');
+    return {...implementation,readiness:reasons.length?'not_ready':'ready_to_integrate',ready:reasons.length===0,reasons,integration,verifiedAt:this.now(),testsVerifiedByCore:false,validatedConsensus:false};
+  }
+  async implementationAction(id:string,owner:string,operationId:string,raw:ImplementationAction){
+    this.assertOwner(id,owner);uuid.parse(operationId);const action=implementationActionSchema.parse(raw);
+    const existing=this.implementation.existing(id,operationId,action);if(existing)return {...existing,reused:true};
+    const guard=()=>{const active=this.requireActive(id);if(active.error)throw new Error(active.error);this.coordination.guard(id);if(!this.implementation.plan(id))throw new Error('No implementation contract in this run');};
+    guard();const contextVersion=this.coordination.version(id);
+    const captured=action.action==='capture'?await captureImplementation(this.implementation.plan(id)!,contextVersion):null;
+    const inspection=action.action==='inspect'?await this.inspectImplementation(id,owner):null;
+    return this.db.transaction(()=>{
+      const repeated=this.implementation.existing(id,operationId,action);if(repeated)return {...repeated,reused:true};guard();if(this.coordination.version(id)!==contextVersion)throw new Error('Context changed during implementation operation');
+      let result:unknown;
+      if(action.action==='capture'){
+        const candidate=this.implementation.capture(id,captured!,operationId);
+        const body='Implementation candidate (captured by Codex, files attributed to assigned workspaces, not proven writers).\n'+JSON.stringify({baseCommit:candidate.baseCommit,contextVersion,contentHash:candidate.contentHash,isolation:this.implementation.plan(id)!.isolation,workspaces:candidate.snapshots.map(s=>({provider:s.provider,root:s.root,files:s.files}))});
+        this.recordReport(id,owner,operationId,{kind:'result',taskId:action.taskId,resultId:candidate.resultId,version:candidate.version,title:'Implementation candidate v'+candidate.version,disagreements:[]},body);result={candidate};
+      }else if(action.action==='check')result=this.implementation.check(id,operationId,owner,action);
+      else result=inspection;
+      this.event(id,'implementation_'+action.action,owner,{operationId,contextVersion});return this.implementation.save(id,operationId,action,result);
     }).immediate();
   }
   list(owner: string) {
@@ -445,6 +491,7 @@ export class RunStore {
       '', '## Objetivo','',run.context.objective,'','## Contexto','',JSON.stringify(run.context,null,2),'','## Participantes',''];
     for (const peer of run.participants) lines.push(`- ${peer.provider}: ${peer.name} (${peer.sessionId}); ${peer.surface}; PID ${peer.pid}; inicio ${peer.procStart}; carpeta ${peer.project.directory}; HEAD ${peer.project.head??'sin Git/HEAD'}.`);
     lines.push('','## Coordinación estructurada','',JSON.stringify(run.coordination,null,2),'','## Rutina','',JSON.stringify(run.routine,null,2),'','Colaboración guiada; independencia no garantizada.');
+    lines.push('','## Implementation contract and immutable candidates','',JSON.stringify(run.implementation,null,2),'','No editor locks or execution permissions granted. Test receipts are declarations; integration preparation does not publish changes.');
     lines.push('','## Resultados y revisiones','');
     for(const report of run.reports)lines.push(`### ${report.id}`,'',`Autor: ${report.author}; fuente: ${report.source_message??'declaración local'}; declaración del agente, sin validación intelectual del núcleo.`,'',JSON.stringify(report.report),'',report.body,'');
     for(const review of run.reviews)lines.push(`Revisión ${review.id}: hash objetivo ${review.targetHash}; versión vigente: ${review.current}; consenso validado: false.`);

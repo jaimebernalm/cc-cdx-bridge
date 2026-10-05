@@ -9,7 +9,8 @@ import { outboundServer, refreshReceiver, sendViaReceiver } from './outbound';
 import { PeerGuard } from './guard';
 import { RunStore } from './runs';
 import { ProjectAuthorizations } from './project-authorization';
-import { inspectParticipant, matchesProcess, sameSnapshot } from './participants';
+import {captureImplementation} from './implementation';
+import { inspectParticipant, matchesProcess, sameScopedSnapshot } from './participants';
 import { version } from './version';
 
 type Message = { id: string; peer_id: string; direction: string; text: string; status: string; turn_id: string | null;
@@ -167,6 +168,7 @@ export class Bridge {
         this.db.run("INSERT INTO receiver_capabilities VALUES ('managed_runs_v1',?,?)",[process.pid,procStart]);
         this.db.run("INSERT INTO receiver_capabilities VALUES ('guided_runs_v1',?,?)",[process.pid,procStart]);
         this.db.run("INSERT INTO receiver_capabilities VALUES ('structured_runs_v1',?,?)",[process.pid,procStart]);
+        this.db.run("INSERT INTO receiver_capabilities VALUES ('implementation_v1',?,?)",[process.pid,procStart]);
         this.db.run("INSERT INTO receiver_capabilities VALUES ('panel_commands_v1',?,?)",[process.pid,procStart]);
         this.db.run("INSERT INTO receiver_capabilities VALUES ('project_authorization_v1',?,?)",[process.pid,procStart]);
         this.db.run('INSERT INTO receiver_capabilities VALUES (?,?,?)',[`distribution_version:${version}`,process.pid,procStart]);
@@ -655,7 +657,9 @@ export class Bridge {
       if (managed) {
         try {
           const fresh=await Promise.all(managed.participants.map(peer=>inspectParticipant({configDir:this.configDir,stateDir:this.stateDir,ipcPath:this.ipcPath},peer.sessionId,peer.provider)));
-          if (managed.participants.some((peer,index)=>!sameSnapshot(peer,fresh[index]!))) throw new Error('Managed project or process changed');
+          const plan=this.runs.implementationPlan(managed.runId);
+          if (managed.participants.some((peer,index)=>!sameScopedSnapshot(peer,fresh[index]!,plan))) throw new Error('Managed project or process changed');
+          if(plan)await captureImplementation(plan,this.runs.status(managed.runId,this.threadId).contextVersion);
         } catch {
           this.runs.block(managed.runId,'participant_or_project_changed');
           this.db.run("UPDATE messages SET status='dropped',drop_reason='participant-or-project-changed',awaiting_input=0 WHERE id=?",[message.id]);

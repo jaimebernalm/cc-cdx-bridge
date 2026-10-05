@@ -1,33 +1,38 @@
 import { Bridge } from './bridge';
 import { formatManaged } from './managed-message';
 import { compareProjects } from './project';
-import { discoverParticipants, inspectParticipant, sameSnapshot, type ParticipantOptions } from './participants';
+import { discoverParticipants, inspectParticipant, sameScopedSnapshot, type ParticipantOptions } from './participants';
 import { RunStore, contextSchema, limitsSchema, type Context, type Limits } from './runs';
 import { SendRefused } from './claude';
 import { type CoordinationInput, type Control } from './coordination';
 import { randomUUID } from 'node:crypto';
+import {normalizeImplementation,captureImplementation,type ImplementationInput} from './implementation';
 import { normalizeRoutine, guide, formatWork, type RoutineInput, type Task } from './routines';
 
 export class Collaboration {
   constructor(readonly store: RunStore, readonly owner: string, private options: ParticipantOptions, private bridge: Bridge) {}
   discover() { return discoverParticipants(this.options.configDir,this.options.stateDir); }
-  async prepare(input: {requestId:string; peerId:string; context:Context; limits:Limits; revisionPolicy:'same'|'compare'; comparisonBase?:string; routine?:RoutineInput;coordination?:CoordinationInput}) {
+  async prepare(input: {requestId:string; peerId:string; context:Context; limits:Limits; revisionPolicy:'same'|'compare'; comparisonBase?:string; routine?:RoutineInput;coordination?:CoordinationInput;implementation?:ImplementationInput}) {
     normalizeRoutine(input.routine,input.context.priorAnalysis);
     const [codex,claude]=await Promise.all([
       inspectParticipant(this.options,this.owner,'codex',true,!!input.coordination),inspectParticipant(this.options,input.peerId,'claude'),
     ]);
+    if(input.implementation && !codex.implementationReceiver)throw new Error('Reload the receiver for implementation_v1 before enabling writing');
+    const implementation=input.implementation?await normalizeImplementation(input.implementation,[codex,claude]):undefined;
     const comparison=await compareProjects(codex.project,claude.project,input.revisionPolicy,input.comparisonBase);
-    const id=this.store.prepare(this.owner,input.requestId,contextSchema.parse(input.context),limitsSchema.parse(input.limits),[codex,claude],comparison,input.routine,input.coordination);
+    const id=this.store.prepare(this.owner,input.requestId,contextSchema.parse(input.context),limitsSchema.parse(input.limits),[codex,claude],comparison,input.routine,input.coordination,implementation);
     return this.store.status(id,this.owner);
   }
   private async validate(id: string, allowBusyPeer: boolean) {
     this.store.assertOwner(id,this.owner);
     const saved=this.store.participants(id);
     const fresh=await Promise.all(saved.map(peer=>inspectParticipant(this.options,peer.sessionId,peer.provider,peer.provider==='codex',peer.provider==='codex'&&!!this.store.status(id,this.owner).coordination)));
+    const plan=this.store.implementationPlan(id);
     for (let i=0;i<saved.length;i++) {
-      if (!sameSnapshot(saved[i]!,fresh[i]!)) throw new Error('Participant process, project or revision changed; prepare a new collaboration');
+      if (!(sameScopedSnapshot(saved[i]!,fresh[i]!,plan))) throw new Error('Participant process, project or revision changed; prepare a new collaboration');
       if (fresh[i]!.provider==='claude' && !allowBusyPeer && fresh[i]!.status!=='idle') throw new Error('Claude participant is busy or its activity is unknown; wait or explicitly choose allowBusyPeer');
     }
+    if(plan)await captureImplementation(plan,this.store.status(id,this.owner).contextVersion);
   }
   async start(id: string, allowBusyPeer=false) {
     const existing=this.store.status(id,this.owner);
@@ -50,6 +55,7 @@ export class Collaboration {
     const header={runId:id,messageId,contextVersion:run.contextVersion,replyTo};
     let prompt=task?formatWork(task,text):text;
     if(task?.target){const result=run.results.find(r=>r.report.kind==='result' && r.report.resultId===task.target!.resultId && r.report.version===task.target!.version)!;
+      const candidate=this.store.implementationMaterial(id,task.target.resultId,task.target.version);if(candidate)prompt+='\n\nCaptured implementation patches for the exact candidate; review these, not a later working tree:\n'+JSON.stringify(candidate);
       prompt+='\n\nBorrador exacto para este encargo:\n'+JSON.stringify({resultId:task.target.resultId,version:task.target.version,contentHash:result.contentHash,author:result.author,title:result.report.kind==='result'?result.report.title:'',content:result.body});}
     const replyHeader='CC_CDX_RUN_V1 '+JSON.stringify({runId:id,contextVersion:run.contextVersion,messageId:randomUUID(),replyTo:messageId});
     const structuredReply=task?'\nPara una respuesta estructurada, copia también esta segunda línea y escribe tu texto después:\n'
@@ -59,6 +65,7 @@ export class Collaboration {
         :'Para kind=response adapta únicamente declaredState (analysis/perspective/needs_input/blocked/done) y disagreements; conserva taskId. No añadas verdict, resultId, version ni title: corresponden a otros tipos de informe.')
       +' Son declaraciones tuyas, no estados del núcleo. Si eliges proponer un resultado, sustituye la segunda línea completa por kind=result con exclusivamente taskId, resultId UUID nuevo, version=1, title y disagreements. No mezcles campos entre tipos; no añadas author ni permisos.':'';
     const wire=formatManaged(header, prompt+`\n\nContexto compartido (versión ${run.contextVersion}):\n`+JSON.stringify(run.context)+(run.coordination?'\nControl estructurado: '+JSON.stringify({phase:run.coordination.phase,contextVersion:run.contextVersion,barrierOpen:run.coordination.barrierOpen})+'. El controlador conserva los informes iniciales en privado hasta abrir la barrera.':'')
+      +(run.implementation?'\n\nImplementation contract (does not grant tool permissions; work only within these assigned paths):\n'+JSON.stringify(run.implementation.plan):'')
       +(run.routine?'\n\nOrientación de colaboración:\n'+JSON.stringify(guide(run.routine)):'')
       +'\n\nPara registrar una respuesta, usa SendMessage al nombre de Codex indicado en este mensaje. Puedes copiar esta primera línea de un solo uso:\n'
       +replyHeader+structuredReply

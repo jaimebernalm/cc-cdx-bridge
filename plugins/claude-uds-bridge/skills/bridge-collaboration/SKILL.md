@@ -1,11 +1,13 @@
 ---
 name: bridge-collaboration
-description: Coordinate this Codex Desktop chat with an existing Claude Desktop Code conversation through CC–CDX Bridge when the user asks them to collaborate, investigate, review, contrast proposals or continue their prior analyses together. Supports free collaboration and optional research/review guidance. Do not use for a solo task that merely mentions Claude.
+description: Coordinate this Codex Desktop chat with an existing Claude Desktop Code conversation through CC–CDX Bridge when the user asks them to collaborate, investigate, review, contrast proposals or continue their prior analyses together. Supports nine optional orientations and scoped implementation candidates. Do not use for a solo task that merely mentions Claude.
 ---
 
 # Bridge collaboration
 
-Help the two agents make useful progress on the user's objective and give the user a readable result with evidence, authorship and unresolved disagreements. Use `free` unless the user selects research/review or their requested use clearly fits one of those orientations. These are guides, not fixed intellectual roles or required rounds. Adapt questions, checks and synthesis to what the objective needs.
+Help the two agents make useful progress on the user's objective and give the user a readable result with evidence, authorship and unresolved disagreements. Use `free` unless the user selects a more specific orientation or their requested use clearly fits research, review, diagnose, architecture, product, test_design, compare or implement. These are guides, not fixed intellectual roles or required rounds. Adapt questions, checks and synthesis to what the objective needs.
+
+For human-authorized coordinated implementation, read [references/implementation.md](references/implementation.md) before enabling a write contract. Selecting implement alone never grants editing permissions.
 
 Read [references/structured.md](references/structured.md) for the optional initial barrier, pause, mutable context or crash recovery. Read [references/api.md](references/api.md) when preparing a run or constructing a structured response/result/review. Tools are provided by this plugin's `claude-uds-bridge` MCP server. If unavailable, diagnose the plugin/reload; do not simulate another model's answer.
 

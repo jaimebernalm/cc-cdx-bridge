@@ -9,10 +9,11 @@ import { discoverParticipants, inspectParticipant, sameSnapshot, type Participan
 import { compareProjects } from './project';
 import { readDesktopInputSnapshot, deliverToDesktop } from './desktop';
 import { doctor } from './doctor';
+import {normalizeImplementation} from './implementation';
 import { version } from './version';
 import { ProjectAuthorizations, authorizationIdentitySchema, authorizationChangeSchema } from './project-authorization';
 import { processStart } from './claude';
-import { normalizeRoutine, routineGuides } from './routines';
+import { normalizeRoutine, routineGuides, routineCatalog } from './routines';
 
 const equal=(a:string,b:string)=>Buffer.byteLength(a)===Buffer.byteLength(b)&&timingSafeEqual(Buffer.from(a),Buffer.from(b));
 type Options=ParticipantOptions&{codexHome:string;pluginRoot:string;ownerThread?:string;port?:number};
@@ -40,6 +41,7 @@ export function startPanel(options:Options){
       const routine=normalizeRoutine(input.command.routine,input.command.context.priorAnalysis);
       if(input.command.coordination.initialBarrier&&(routine.starts.codex!=='new'||routine.starts.claude!=='new'))throw new Error('Initial barrier requires new analyses from both agents');
       const claude=await inspectParticipant(options,input.command.peerId,'claude');
+      if(input.command.implementation){if(!codex.implementationReceiver)throw new Error('Reload this receiver for implementation_v1');await normalizeImplementation(input.command.implementation,[codex,claude]);}
       await compareProjects(codex.project,claude.project,input.command.revisionPolicy,input.command.comparisonBase);
       if(claude.status!=='idle'&&!input.command.allowBusyPeer)throw new Error('Claude is busy; wait or choose the explicit busy option');
       if(input.command.continuedFrom)store.assertOwner(input.command.continuedFrom,input.ownerThread);
@@ -128,7 +130,7 @@ export function startPanel(options:Options){
             if(change.enabled&&!id.receiverSupported)throw new Error('Reload this chat receiver before remembering project authorization');
             return json({...authorizations.change({...change,project:id.project}),chatPolicy:id.chatPolicy,receiverSupported:id.receiverSupported});
           }
-          if(url.pathname==='/api/v1/presets'&&req.method==='GET')return json(Object.entries(routineGuides).map(([id,guidance])=>({id,guidance})));
+          if(url.pathname==='/api/v1/presets'&&req.method==='GET')return json(routineCatalog.map(p=>({...p,guidance:routineGuides[p.id]})));
           if(url.pathname==='/api/v1/runs'&&req.method==='GET')return json(list());
           if(url.pathname==='/api/v1/commands'&&req.method==='GET')return json(await inspectCommands());
           if(url.pathname==='/api/v1/preflight'&&req.method==='POST'){const input=panelRequestSchema.parse(await body(req));await identity(input);return json({ready:true});}
@@ -146,10 +148,16 @@ export function startPanel(options:Options){
             const report=await doctor({project:input.project,threadId:input.ownerThread,peerId:input.peerId,configDir:options.configDir,codexHome:options.codexHome,pluginRoot:options.pluginRoot});
             return json({state:report.state,checks:report.checks.map(c=>({code:c.code,level:c.level,message:c.code==='runtime'?`Bun ${Bun.version}; distribution ${version}`:c.message,remedy:c.remedy})),settingsModified:false,messagesSent:false});
           }
-          const match=url.pathname.match(/^\/api\/v1\/runs\/([\da-f-]{36})(?:\/(events|stream|export))?$/i);
+          const match=url.pathname.match(/^\/api\/v1\/runs\/([\da-f-]{36})(?:\/(events|stream|export|patch|implementation))?$/i);
           if(match&&req.method==='GET'){
             const id=z.string().uuid().parse(match[1]),owner=ownerFor(id);const run=store.status(id,owner);
             if(!match[2])return json(run);
+            if(match[2]==='implementation')return json(await store.inspectImplementation(id,owner));
+            if(match[2]==='patch'){
+              const inspection=await store.inspectImplementation(id,owner);
+              if(!inspection.ready||!inspection.integration?.patch)return json({error:inspection.reasons.join('; ')||'Integration is not ready'},409);
+              return new Response(inspection.integration.patch,{headers:{...headers,'Content-Type':'text/x-diff; charset=utf-8','Content-Disposition':`attachment; filename="implementation-${id}.patch"`}});
+            }
             if(match[2]==='export'){const format=z.enum(['markdown','json']).parse(url.searchParams.get('format')??'markdown');return new Response(store.export(id,owner,format),{headers:{...headers,'Content-Type':format==='json'?'application/json':'text/markdown; charset=utf-8','Content-Disposition':`attachment; filename="collaboration-${id}.${format==='json'?'json':'md'}"`}});}
             const after=z.coerce.number().int().min(0).parse(url.searchParams.get('after')??req.headers.get('last-event-id')??0);
             if(match[2]==='events')return json({events:run.events.filter(e=>e.sequence>after).slice(0,100),cursor:run.events.filter(e=>e.sequence>after).slice(0,100).at(-1)?.sequence??after});

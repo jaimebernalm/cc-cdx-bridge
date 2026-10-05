@@ -5,16 +5,19 @@ import { createHash, randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { privateDirectory, uuid, processStart } from './claude';
 import { contextSchema, limitsSchema } from './runs';
+import {implementationSchema,implementationActionSchema} from './implementation';
 import { routineSchema } from './routines';
 import { coordinationSchema } from './coordination';
 import { type Collaboration } from './collaboration';
 
 const preparation = z.object({ peerId: uuid, context: contextSchema, limits: limitsSchema,
   routine: routineSchema, coordination: coordinationSchema, revisionPolicy: z.enum(['same','compare']).default('same'),
+  implementation:implementationSchema.optional(),
   comparisonBase: z.string().min(1).max(256).optional(), allowBusyPeer: z.boolean().default(false),
   continuedFrom: uuid.optional() }).strict();
 export const panelActionSchema = z.discriminatedUnion('action',[
   preparation.extend({action:z.literal('create')}),
+  z.object({action:z.literal('implementation'),runId:uuid,expectedRevision:z.number().int().min(0),work:implementationActionSchema}).strict(),
   z.object({action:z.enum(['pause','resume','recover','cancel']),runId:uuid,expectedRevision:z.number().int().min(0)}).strict(),
   z.object({action:z.literal('input'),runId:uuid,expectedRevision:z.number().int().min(0),text:z.string().trim().min(1).max(4000)}).strict(),
 ]);
@@ -56,7 +59,7 @@ export class PanelCommands {
     if(row.state==='applied')return {...JSON.parse(row.result!),reused:true};
     const procStart=await processStart(process.pid);
     if(!this.db.run("UPDATE panel_commands SET state='applying',processor_pid=?,processor_start=? WHERE id=? AND state IN ('queued','waking','notified','unknown')",[process.pid,procStart,id]).changes)throw new Error('Command is already applying or failed; do not replay uncertain work');
-    const command=panelActionSchema.parse(JSON.parse(row.payload));let runId:string|undefined;
+    const command=panelActionSchema.parse(JSON.parse(row.payload));let runId:string|undefined;let implementationResult:unknown;
     try{
       if(command.action==='create'){
         if(command.continuedFrom)c.store.assertOwner(command.continuedFrom,c.owner);
@@ -66,12 +69,15 @@ export class PanelCommands {
       }else{
         runId=command.runId;const status=c.store.status(runId,c.owner);
         if(status.coordination?.revision!==command.expectedRevision)throw new Error('Control revision changed; refresh before submitting again');
-        if(command.action==='cancel')c.store.stop(runId,c.owner,'cancelled','Cancelled from the local panel');
+        if(command.action==='implementation'){
+          if(command.work.action==='capture')await c.control(runId,row.id,command.expectedRevision,{action:'task',task:{taskId:command.work.taskId,intent:'synthesize'}});
+          implementationResult=await c.store.implementationAction(runId,c.owner,row.id,command.work);
+        }else if(command.action==='cancel')c.store.stop(runId,c.owner,'cancelled','Cancelled from the local panel');
         else if(command.action==='input')await c.control(runId,row.id,command.expectedRevision,{action:'context',context:{...status.context,constraints:[...status.context.constraints,command.text]}});
         else await c.control(runId,row.id,command.expectedRevision,{action:command.action});
       }
-      const run=c.store.status(runId,c.owner);const result={runId,action:command.action,continuedFrom:command.action==='create'?command.continuedFrom:null,state:run.state,
-        guidance:command.action==='create'?'The human started this collaboration in the local panel. Continue the objective in this exact chat using collaboration tools and the bridge skill. Preparing/start sent no intellectual tasks. Assign your own task, send Claude one task, do your analysis and preserve disagreements. Do not change settings or permissions.':command.action==='input'?'The human versioned the shared context. Inspect stale tasks and adapt work; never resend an uncertain delivery.':'Panel control applied. Inspect authoritative state before further work.'};
+      const run=c.store.status(runId,c.owner);const result={runId,action:command.action,continuedFrom:command.action==='create'?command.continuedFrom:null,state:run.state,implementation:implementationResult,
+        guidance:command.action==='create'?'The human started this collaboration in the local panel. Continue the objective in this exact chat using collaboration tools and the bridge skill. Preparing/start sent no intellectual tasks. Assign your own task, send Claude one task, do your analysis and preserve disagreements. If an implementation contract is present, follow its exact assigned roots/paths; use normal permitted editing/test tools, capture the candidate, record declared check receipts, then request an exact-candidate peer review before integration inspection. Preparing integration never authorizes commit, push or deployment. Do not change settings or permissions.':command.action==='input'?'The human versioned the shared context. Inspect stale tasks and adapt work; never resend an uncertain delivery.':'Panel control applied. Inspect authoritative state before further work.'};
       this.db.run("UPDATE panel_commands SET state='applied',run_id=?,result=?,error=NULL WHERE id=?",[runId,JSON.stringify(result),id]);return result;
     }catch(error){this.db.run("UPDATE panel_commands SET state='failed',run_id=?,error=? WHERE id=?",[runId??null,error instanceof Error?error.message:'Command failed',id]);throw error;}
   }

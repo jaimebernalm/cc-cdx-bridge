@@ -216,3 +216,14 @@ El alcance es la carpeta exacta: solo futuras respuestas correlacionadas del par
 ## Piloto y recuperación (fase 5)
 
 La candidata local 0.7.0 endurece diagnóstico, reinicio del panel y ciclo de instalación. [Guía del piloto](docs/PILOTO.md) · [Plan y evidencia de fase 5](docs/FASE_5.md). Actualizar archivos no recarga MCP/receptores vivos; el diagnóstico lo distingue. Las exportaciones completas son privadas; `sanitize:pilot` genera un resumen por lista permitida.
+
+
+## Fase 6: ampliar usos y preparar cambios
+
+La candidata 0.8.0 añade diagnóstico, arquitectura, producto, diseño de pruebas, comparación e implementación al catálogo compartido, manteniendo colaboración libre por defecto. [Plan y evidencia de fase 6](docs/FASE_6.md).
+
+Para escritura coordinada, prepara un contrato explícito sobre una base Git común limpia: archivos distintos en un checkout compartido (acuerdo, sin bloqueos de editor), o worktrees existentes separados (aislamiento de archivos, sin nuevos permisos). Captura un candidato inmutable, ejecuta pruebas con las herramientas habituales y registra recibos declarados; Claude revisa la versión exacta. La ficha **Implementación** comprueba alcance, vigencia y conflictos y permite descargar un parche revalidado. Prepararlo no aplica cambios, hace commit ni publica. Elegir el uso Implementación sin contrato sirve para planificar.
+
+Los tests y veredictos de los agentes siguen siendo declaraciones; la preparación verifica condiciones técnicas, no consenso. Se requieren receptores con `implementation_v1`: actualizar archivos no recarga procesos vivos. [Workflow y API de implementación](plugins/claude-uds-bridge/skills/bridge-collaboration/references/implementation.md).
+
+Piloto nativo validado en macOS con Codex y Claude Desktop: escritura en worktrees separados, integración de la versión corregida con 31 pruebas aprobadas, revisión atribuida a esa versión y descarga real del parche desde el panel. Un cambio posterior invalida la preparación y el panel muestra el rechazo de descarga. La prueba conserva permisos, ajustes e índices originales; no publica cambios ni certifica consenso. La candidata está instalada localmente; todavía requiere revisión y CI de su PR.

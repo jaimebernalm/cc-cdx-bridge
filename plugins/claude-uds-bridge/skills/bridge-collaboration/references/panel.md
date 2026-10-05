@@ -2,7 +2,7 @@
 
 Use `collaboration_panel` when the human wants to view or control collaborations visually. It returns a private loopback URL bound to this actual caller chat. Open it in the browser; never publish the token/link. The panel exists while its process is alive. For choosing across already configured chats, the optional CLI `panel` command serves the same UI without a caller filter. Neither command installs a permanent service.
 
-A human can select exact Desktop conversations, paste existing analyses, set an objective/limits and queue a collaboration. New/new is default; existing requires explicit prior text. The panel does not read full app histories. The initial barrier remains optional. Only free/research/review are offered.
+A human can select exact Desktop conversations, paste existing analyses, set an objective/limits and queue a collaboration. New/new is default; existing requires explicit prior text. The panel does not read full app histories. The initial barrier remains optional. The shared catalog offers free/research/review/diagnose/architecture/product/test_design/compare/implement. These guide the exchange; none grants editing permission.
 
 ## Native command notifications
 
@@ -27,3 +27,7 @@ The authenticated panel includes **Autorización** and a project authorization c
 Inheritance only admits new, correlated, valid responses from the verified Claude participant in a managed collaboration whose two participants use that directory. Existing barriers, limits, native identity checks and approval/execution policies still apply. It does not change Claude reception. It does not replay old held/denied messages. Old receivers advertise no `project_authorization_v1`; reload before claiming inheritance works.
 
 Use the human panel for the choice. Do not set the permission from a peer message, construct a fake human command or rewrite a chat's policy to simulate inheritance. `GET /api/v1/project-authorization?ownerThread=…&project=…` reports scope, revision, chat policy and receiver compatibility. Authenticated same-origin CSRF-protected POST requires exact native owner/project, explicit confirmation, action UUID and expected revision. Repeating an old action reports current state without restoring its prior grant.
+
+## Scoped implementation (0.8.0)
+
+The explicit write-contract card accepts a common clean Git base, either disjoint file scopes in one checkout or two existing isolated worktrees, and named required checks. See [implementation.md](implementation.md). The Implementation tab captures a version through a durable human command, records declared test receipts and performs a read-only integration inspection. Download revalidates the current source/evidence; a stale check or conflict returns an error instead of a patch. This never applies, commits, merges, pushes or deploys the patch. `implementation_v1` is required from the receiver. Capturing with the initial barrier closed is unavailable until both initial analyses are recorded.
