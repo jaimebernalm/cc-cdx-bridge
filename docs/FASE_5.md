@@ -87,7 +87,7 @@ Panel CLI reiniciado de verdad: aviso visible de servicio detenido, credencial n
 
 El ensayo final `REAL_P5_IDLE_701` desde el panel despertó el chat nativo inactivo, recibió la revisión exacta de Claude y terminó con dos mensajes. Orden consumida una vez, respuesta consumida, ninguna reserva pendiente y seis órdenes anteriores conservadas. Receptor 0.7.0; política `default`, autorización de carpeta revisión 1 y ajustes de Claude idénticos a la línea base privada de este turno. Cierre `validatedConsensus:false`. Evidencia privada: `idle-real-evidence.json` y `idle-real-export.json`.
 
-CI Linux/macOS aprobada sobre `0e1b6d6`: [ejecución 37251746068](https://github.com/jaimebernalm/cc-cdx-bridge/actions/runs/37251746068). Se publica la rama para ejecutar CI; no se abrió PR ni se fusionó/publicó una release de fase 5. La CI también comprueba los ajustes finales de UI (cierre sin resultado y objetivo largo desplegable) y su bundle; consultar la ejecución del HEAD antes de preparar PR.
+CI Linux/macOS aprobada sobre `0e1b6d6`: [ejecución 37251746068](https://github.com/jaimebernalm/cc-cdx-bridge/actions/runs/37251746068). Se publica la rama para ejecutar CI; no se abrió PR ni se fusionó/publicó una release de fase 5. Los ajustes finales de UI (cierre sin resultado y objetivo largo desplegable) y su bundle también pasaron CI Linux/macOS sobre `7581383`: [ejecución 37252604058](https://github.com/jaimebernalm/cc-cdx-bridge/actions/runs/37252604058). El cache instalado coincide con los seis archivos backend/UI del checkout final.
 
 ## Inventario final de ensayos reales
 
@@ -97,7 +97,7 @@ Esta tabla distingue pruebas con modelos Desktop de fixtures. «Pendiente» no e
 |---|---|
 | L01 | Pasado: investigación/revisión con el chat propietario activo; seis mensajes correlacionados, consumidos. |
 | L02 | Pasado: chat Codex inactivo despertado desde UI, dos mensajes y cierre. |
-| L03 | Parcial: se envió una segunda tarea con Claude observado ocupado; completó sus ocho tests sin interrupción. No hay marcas de tiempo que prueben llegada durante su herramienta. Repetir con esa evidencia antes de dar el caso completo por pasado. |
+| L03 | Parcial: se envió una segunda tarea con Claude observado ocupado; completó sus ocho tests sin interrupción. No hay marcas de tiempo que prueben llegada durante su herramienta. El ensayo adicional `REAL_P5_TOOL_701` fue detenido por la pregunta humana de Claude: su instrucción previa prohíbe modificar archivos y el ensayo pedía dos temporales. Se cerró incompleto sin segunda tarea, reenvío ni cambio de permisos. Repetir con autorización expresa o una herramienta sin archivos y evidencia temporal antes de dar el caso completo por pasado. |
 | L04 | No repetido con 0.7.0: continuación de dos análisis previos comprobada en fases anteriores. |
 | L05 | Pasado: inicio mixto con análisis previo de Codex y análisis nuevo de Claude, procedencia explícita. |
 | L06 | Fixtures pasan con alias iguales e identidades exactas. No se crearon dos conversaciones Claude reales con nombres iguales; ensayo nativo pendiente. |
@@ -122,3 +122,9 @@ Esta tabla distingue pruebas con modelos Desktop de fixtures. «Pendiente» no e
 4. Ejecutar una colaboración nueva y breve desde el panel con el chat de prueba existente; correlacionar respuesta y contar entradas. Registrar por separado MCP y receptor 0.7.0 y marcar L11 solo después de esa evidencia.
 5. Para L03, registrar inicio/fin de una herramienta acotada de Claude y comprobar que el segundo mensaje se envió entre ambos, sin interrumpirla. L06, L10 y L17 necesitan ensayos nativos separados; un chat nuevo requiere petición explícita del usuario, no la sustituye un fixture.
 6. Actualizar esta tabla y el resumen saneado. No anunciar la matriz completa ni la fase 5 cerradas antes de resolver esos pendientes.
+
+### Estado al entregar el turno
+
+No quedan colaboraciones de prueba activas ni reservas. El panel real 0.7.0 queda abierto; se detuvieron el panel antiguo y el fixture temporal. Claude conserva una pregunta humana pendiente del ensayo L03: no aceptarla automáticamente al reanudar; la colaboración original ya está cerrada. Si el usuario autoriza los temporales, usar IDs y run nuevos para repetir la prueba, sin atribuir una respuesta tardía al run nuevo. La pregunta asíncrona de Codex explica exactamente ese alcance.
+
+Para completar el piloto faltan los ensayos nativos indicados en la tabla, incluyendo reapertura de apps y chat nuevo con MCP 0.7.0. No preparar una release ni declarar la matriz aprobada hasta completarlos. El chat nuevo necesita autorización explícita según la herramienta de creación de chats; los existentes siguen disponibles.
