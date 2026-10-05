@@ -7,7 +7,7 @@ import { z } from "zod";
 
 const requestSchema = z.object({ type: z.string(), requestId: z.string().optional(), method: z.string(), params: z.unknown() });
 
-export async function receiver(state: 'active' | 'idle', dropAcknowledgement = false, endBeforeSteer = false, root = mkdtempSync('/tmp/desktop-test-'), options: { streamVersion?: number } = {}) {
+export async function receiver(state: 'active' | 'idle', dropAcknowledgement = false, endBeforeSteer = false, root = mkdtempSync('/tmp/desktop-test-'), options: { streamVersion?: number;rejectUnknownOwners?:boolean } = {}) {
   mkdirSync(join(root, 'ipc'), { mode: 0o700 });
   const path = join(root, 'ipc', 'ipc.sock');
   const threadId = randomUUID();
@@ -15,6 +15,7 @@ export async function receiver(state: 'active' | 'idle', dropAcknowledgement = f
   const submissions: { method: string; params: unknown }[] = [];
   let permissions: unknown = { approvalPolicy: 'on-request', sandboxPolicy: { type: 'workspaceWrite' } };
   let history: Record<string, unknown> = { turns: [], turnHistory: { kind: 'legacy' } };
+  let project=root;
   const clients = new Set<net.Socket>();
   const announce = new Set<() => void>();
   const server = net.createServer(socket => {
@@ -43,12 +44,16 @@ export async function receiver(state: 'active' | 'idle', dropAcknowledgement = f
         const reply = (result: unknown) => write({ type: 'response', requestId: request.requestId,
           handledByClientId: 'owner', resultType: 'success', result });
         if (request.method === 'initialize') reply({ clientId: 'test-client' });
-        else if (request.method === 'thread-owner-discovery') reply({ supportsUntrustedAppInput: true });
+        else if (request.method === 'thread-owner-discovery') {
+          const params=request.params as {conversationId:string};
+          if(options.rejectUnknownOwners&&params.conversationId!==threadId)write({type:'response',requestId:request.requestId,resultType:'error',error:'Unknown fixture conversation'});
+          else reply({ supportsUntrustedAppInput: true });
+        }
         else if (request.method === 'thread-stream-following-changed') {
           if (!z.object({ following: z.boolean() }).parse(request.params).following) continue;
           write({ type: 'broadcast', sourceClientId: 'owner', method: 'thread-stream-state-changed', version: options.streamVersion ?? 11,
             params: { conversationId: threadId, change: { type: 'snapshot',
-              conversationState: { cwd: root, threadRuntimeStatus: { type: state }, currentPermissions: permissions, ...history } } } });
+              conversationState: { cwd: project, threadRuntimeStatus: { type: state }, currentPermissions: permissions, ...history } } } });
         } else {
           if (request.method === 'thread-follower-steer-turn' && endBeforeSteer) {
             state = 'idle';
@@ -67,6 +72,7 @@ export async function receiver(state: 'active' | 'idle', dropAcknowledgement = f
   await once(server, 'listening');
   chmodSync(path, 0o600);
   return { path, threadId, turnId, submissions,
+    setProject(value:string){project=value;},
     setHistory(value: Record<string, unknown>) { history = { turns: [], turnHistory: { kind: 'legacy' }, ...value }; },
     setPermissions(value: unknown) { permissions = value; for (const send of announce) send(); },
     setState(value: 'idle' | 'active') { state = value; for (const send of announce) send(); }, close: async () => {

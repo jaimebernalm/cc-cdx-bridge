@@ -5,6 +5,7 @@ import { ownedJson, peers, processStart, uuid } from './claude';
 import { version } from './version';
 import { readDesktopInfo } from './desktop';
 import { observeClaudeSettings, evaluateInbound, type InboundPolicy } from './permissions';
+import { observeProjectAuthorization } from './project-authorization';
 
 export type DoctorOptions = { project: string; threadId?: string; peerId?: string; configDir: string; codexHome: string; pluginRoot: string };
 type Check = { code: string; level: 'ok' | 'warning' | 'blocked'; message: string; remedy?: string };
@@ -62,7 +63,7 @@ export async function doctor(options: DoctorOptions) {
       native = await readDesktopInfo(join(options.codexHome, 'ipc', 'ipc.sock'), options.threadId);
       if (realpathSync(native.project) !== project) add('project_mismatch', 'blocked', 'Codex chat uses a different project.', 'Select the Codex chat whose native project matches this exact directory.');
       else add('desktop_contract', 'ok', 'Native Codex owner supports external input; stream version 11 and project verified.');
-      if (native.runtime.mode === 'unknown') add('policy_unknown', 'warning', 'Codex permission class is unknown.', 'Inspect the existing chat settings; do not infer a class from CLI defaults.');
+      if (native.runtime.mode === 'unknown') add('codex_permission_unknown', 'warning', 'Codex permission class is unknown.', 'Inspect the existing chat settings; do not infer a class from CLI defaults.');
     } catch (error) {
       const unsupported = error instanceof Error && /Unsupported Desktop stream version/.test(error.message);
       add(unsupported ? 'unsupported_version' : 'desktop_unavailable', 'blocked', unsupported ? 'The native Codex stream contract is unsupported.' : 'The native Codex chat could not be inspected.',
@@ -71,6 +72,7 @@ export async function doctor(options: DoctorOptions) {
   }
   const receivers = candidates.filter(peer => peer.sessionId === options.threadId);
   let receiverPolicy: InboundPolicy = 'unknown';
+  let receiverVersion: string|null = null, projectAuthorizationSupported=false;
   if (receivers.length === 0) add('needs_receiver', 'blocked', 'This Codex chat has no active bridge receiver.', 'Use attach_current after loading this plugin, or CLI attach for a supervised local activation. Installing the plugin alone does not load tools in an existing chat.');
   else if (receivers.length !== 1 || receivers[0]!.entrypoint !== 'codex-claude-uds-bridge') add('receiver_conflict', 'blocked', 'Conflicting receiver registrations.', 'Stop duplicate registrations and diagnose their ownership before retrying.');
   else {
@@ -81,7 +83,12 @@ export async function doctor(options: DoctorOptions) {
       if (owner?.pid !== receivers[0]!.pid || owner.proc_start !== receivers[0]!.procStart) throw new Error('Receiver state does not match registry');
       const policy = db.query<{ policy: string }, []>('SELECT policy FROM inbound_policy WHERE singleton=1').get()?.policy;
       receiverPolicy = ['default', 'accept', 'hold', 'refuse'].includes(policy ?? '') ? policy as InboundPolicy : 'unknown';
+      const capabilities=db.query<{capability:string},[number,string]>('SELECT capability FROM receiver_capabilities WHERE pid=? AND proc_start=?').all(owner.pid,owner.proc_start).map(c=>c.capability);
+      receiverVersion=capabilities.find(c=>c.startsWith('distribution_version:'))?.slice('distribution_version:'.length)??null;
+      projectAuthorizationSupported=capabilities.includes('project_authorization_v1');
       add('receiver', 'ok', 'One live receiver matches registry and persisted owner identity.');
+      if(receiverVersion!==version)add('receiver_update_pending','warning','Installed files and the live receiver version differ or the live version is not recorded.', 'An update does not replace running receivers or MCP tools. Finish pending work, reopen the chat and inspect again; do not delete its database or resend uncertain input.');
+      if(!projectAuthorizationSupported)add('receiver_capability_missing','warning','This receiver cannot inherit remembered project reception.', 'Reload the receiver from the current installation after finishing pending work. Explicit chat policies still apply.');
     } catch { add('receiver_state_unknown', 'blocked', 'Receiver registry and persisted state could not be reconciled.', 'Check receiver ownership and state before activating or sending; doctor does not repair it.'); }
     finally { db?.close(); }
   }
@@ -89,6 +96,14 @@ export async function doctor(options: DoctorOptions) {
     add('activation_lock', 'warning', 'An activation lock exists.', 'Wait for activation to finish. If its owner has stopped, inspect and remove the stale lock before retrying.');
   }
   const settings = observeClaudeSettings(options.configDir, project);
+  let projectAuthorization: ReturnType<typeof observeProjectAuthorization>|null=null;
+  try{
+    projectAuthorization=observeProjectAuthorization(join(options.codexHome,'plugin-state','claude-uds-bridge'),project);
+    if(projectAuthorization.enabled)add('project_reception','ok',receiverPolicy==='default'&&projectAuthorizationSupported
+      ?'Remembered reception is enabled for future, valid, correlated replies from the verified Claude participant in a managed run in this exact folder. Ordinary messages are not covered.'
+      :'Project reception is remembered, but an explicit chat policy or an older receiver takes precedence.');
+    else if(projectAuthorization.folderChanged)add('project_folder_changed','warning','The project folder identity changed; its old authorization is not inherited.','Confirm the current folder in the authenticated panel if desired.');
+  }catch{add('project_authorization_unknown','warning','Remembered project reception could not be inspected.','Inspect private state ownership and schema; no permission is inferred or changed.');}
   if (settings.some(item => !item.readable || item.inbound === 'invalid')) add('settings_unreadable', 'warning', 'One or more relevant settings observations are unavailable or invalid.', 'Review the indicated scope locally; doctor never outputs the complete configuration.');
   add('policy_unknown', 'warning', 'Claude Desktop does not expose effective inbound policy, permission class or managed/session overrides in its registry.',
     'Use sessions whose reception is already allowed and an explicitly requested round-trip check. User-level accept affects all Claude sessions; project accept cannot loosen reception. No settings change or message is performed by doctor.');
@@ -97,6 +112,8 @@ export async function doctor(options: DoctorOptions) {
   return { schemaVersion: 1, state: blocker?.code ?? 'policy_unknown', mode: 'supervised_pilot',
     settingsModified: false, messagesSent: false, checks, surfaces,
     selectedClaude: eligible.length === 1 ? eligible[0] : null,
-    codex: native ? { ...native, receiverPolicy, inboundFromClaude: evaluateInbound(receiverPolicy, native.runtime.mode, 'unknown') } : null,
+    codex: native ? { ...native, receiverPolicy, receiverVersion, projectAuthorizationSupported,
+      projectReceptionRemembered:projectAuthorization?.enabled??null,
+      inboundFromClaude: evaluateInbound(receiverPolicy, native.runtime.mode, 'unknown') } : null,
     claudeSettingsObservations: settings, effectiveClaudeInbound: 'unknown', hookTrust: 'not_observable' };
 }

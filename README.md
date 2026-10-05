@@ -183,7 +183,7 @@ bun run build
 
 The plugin runs the bundled `dist/server.js` and `dist/hook.js`, so run `bun run build` after changing anything under `src/`. Dependencies are bundled, and no `node_modules` is needed at runtime.
 
-`bun run verify:installation` is an opt-in Codex CLI check: it installs into a fresh private home under `.local/phase0/`, compares cached distribution files and runs the installed CLI with a reduced app-style PATH. It does not copy authentication, trust hooks, send messages or edit Claude settings. The bundled CLI can also run via `/bin/sh scripts/run-bun.sh dist/cli.js doctor --project /absolute/project`.
+`bun run verify:installation` is an opt-in Codex CLI check: it installs into a fresh private home under `.local/phase5/`, updates from the merged 0.6.1 distribution, compares cached files, runs with a reduced PATH, and verifies uninstall/reinstall retain private history, policies, commands and authorization. It does not copy authentication, trust hooks, send messages or edit Claude settings. The bundled CLI can also run via `/bin/sh scripts/run-bun.sh dist/cli.js doctor --project /absolute/project`.
 
 The Claude transport follows the [socket protocol documented by PeterSR](https://github.com/PeterSR/claude-code-socket-transport/tree/480bd83c0bf1c63161c5afdb0976bbff849c926b). Delivery into Codex uses `thread-follower-steer-turn` and `thread-follower-start-turn` on the existing task and confirms through the returned turn ID.
 
@@ -212,3 +212,7 @@ Para desarrollar la UI: `cd ui && bun install --frozen-lockfile`; el build del p
 En el panel local, abre **Autorización** (también aparece al crear una colaboración), selecciona el chat y pulsa **Recordar autorización para este proyecto → Confirmar autorización**. La elección se guarda y los chats Codex nuevos con recepción `default` pueden heredarla. Puedes revocarla en el mismo lugar.
 
 El alcance es la carpeta exacta: solo futuras respuestas correlacionadas del participante Claude verificado en colaboraciones gestionadas de esa carpeta. Otro worktree requiere su propia elección. Los ajustes explícitos `accept`, `hold` o `refuse` de un chat tienen prioridad; revocar la herencia no cambia su `accept` propio. No se liberan mensajes antiguos ni se cambian los permisos de ejecución/edición o la recepción de Claude. Los receptores anteriores a 0.6.1 necesitan recargarse; el panel muestra su compatibilidad.
+
+## Piloto y recuperación (fase 5)
+
+La candidata local 0.7.0 endurece diagnóstico, reinicio del panel y ciclo de instalación. [Guía del piloto](docs/PILOTO.md) · [Plan y evidencia de fase 5](docs/FASE_5.md). Actualizar archivos no recarga MCP/receptores vivos; el diagnóstico lo distingue. Las exportaciones completas son privadas; `sanitize:pilot` genera un resumen por lista permitida.

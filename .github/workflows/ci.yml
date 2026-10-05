@@ -2,8 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, feature/phase-5-pilot-hardening]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read

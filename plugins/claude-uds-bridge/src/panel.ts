@@ -7,7 +7,7 @@ import { RunStore } from './runs';
 import { PanelCommands, panelRequestSchema, type PanelRequest } from './panel-commands';
 import { discoverParticipants, inspectParticipant, sameSnapshot, type ParticipantOptions } from './participants';
 import { compareProjects } from './project';
-import { readDesktopInputs, deliverToDesktop } from './desktop';
+import { readDesktopInputSnapshot, deliverToDesktop } from './desktop';
 import { doctor } from './doctor';
 import { version } from './version';
 import { ProjectAuthorizations, authorizationIdentitySchema, authorizationChangeSchema } from './project-authorization';
@@ -61,7 +61,7 @@ export function startPanel(options:Options){
     }finally{db.close();}
   };
   const wake=async(input:PanelRequest,snapshot:Awaited<ReturnType<typeof identity>>)=>{
-    const row=commands.get(input.commandId)!;if(!commands.beginWake(row.id,await processStart(process.pid)))return;
+    const row=commands.get(input.commandId)!;if(row.state!=='waking'||row.processor_pid!==process.pid)return;
     try{
       const fresh=await inspectParticipant(options,row.owner,'codex',true,true);
       if(closed)throw new Error('Panel closed before wake; delivery not retried');
@@ -75,6 +75,31 @@ export function startPanel(options:Options){
   };
   const body=async(req:Request)=>{const reader=req.body?.getReader();if(!reader)throw new Error('Missing body');let size=0;const chunks:Uint8Array[]=[];
     while(true){const part=await reader.read();if(part.done)break;size+=part.value.length;if(size>262144){await reader.cancel();throw new Error('Request body exceeds limit');}chunks.push(part.value);}return JSON.parse(Buffer.concat(chunks).toString('utf8'));};
+  let reconciliationCursor=0;
+  const reconcile=async(rows:ReturnType<PanelCommands['list']>)=>{
+    const groups=Map.groupBy(rows.filter(c=>c.state==='unknown'),c=>c.owner);
+    await Promise.allSettled([...groups].map(async([owner,pending])=>{
+      try{
+        const snapshot=await readDesktopInputSnapshot(options.ipcPath,owner),project=realpathSync(snapshot.project),inputs=snapshot.inputs;
+        if(closed)return;
+        for(const command of pending){
+          if(command.project!==project)commands.reconciliationIssue([command.id],'Native project changed; consumption is not attributed to this command');
+          else if(inputs.consumed.some(i=>i.clientId===command.input_id))commands.consumed(command.id);
+          else if(inputs.latest===undefined)commands.reconciliationIssue([command.id],'Native history is incomplete or unavailable; delivery remains uncertain and is not resent');
+          else commands.reconciliationIssue([command.id],'Exact input consumption is not observable; no notification is resent');
+        }
+      }catch{if(!closed)commands.reconciliationIssue(pending.map(c=>c.id),'Native history unavailable; delivery remains uncertain and is not resent');}
+    }));
+  };
+  const inspectCommands=async()=>{
+    await commands.inspectApplications();const rows=commands.list(options.ownerThread);
+    const owners=[...new Set(rows.filter(c=>c.state==='unknown').map(c=>c.owner))];
+    // Bound work per poll; rotate so unavailable chats cannot starve later ones.
+    const selected=new Set(Array.from({length:Math.min(4,owners.length)},(_,i)=>owners[(reconciliationCursor+i)%owners.length]));
+    reconciliationCursor=owners.length?(reconciliationCursor+selected.size)%owners.length:0;
+    await reconcile(rows.filter(c=>selected.has(c.owner)));
+    return commands.list(options.ownerThread).map(c=>commands.public(c));
+  };
   const server=Bun.serve({hostname:'127.0.0.1',port:options.port??0,idleTimeout:0,
     async fetch(req):Promise<Response>{const url=new URL(req.url),origin=`http://127.0.0.1:${server.port}`,cookieName=`cc_cdx_panel_${server.port}`;
       if(req.headers.get('host')!==`127.0.0.1:${server.port}`||url.origin!==origin)return json({error:'Invalid Host'},403);
@@ -105,21 +130,21 @@ export function startPanel(options:Options){
           }
           if(url.pathname==='/api/v1/presets'&&req.method==='GET')return json(Object.entries(routineGuides).map(([id,guidance])=>({id,guidance})));
           if(url.pathname==='/api/v1/runs'&&req.method==='GET')return json(list());
-          if(url.pathname==='/api/v1/commands'&&req.method==='GET'){await commands.inspectApplications();return json(commands.list(options.ownerThread).map(c=>commands.public(c)));}
+          if(url.pathname==='/api/v1/commands'&&req.method==='GET')return json(await inspectCommands());
           if(url.pathname==='/api/v1/preflight'&&req.method==='POST'){const input=panelRequestSchema.parse(await body(req));await identity(input);return json({ready:true});}
           if(url.pathname==='/api/v1/commands'&&req.method==='POST'){
             const input=panelRequestSchema.parse(await body(req));
             if(options.ownerThread&&input.ownerThread!==options.ownerThread)throw new Error('Wrong conversation for this panel');
             const existing=commands.get(input.commandId);
             if(existing){const repeated=commands.enqueue(input);return json({...commands.public(repeated.command),reused:true},202);}
-            const snapshot=await identity(input);const queued=commands.enqueue(input);const pending=wake(input,snapshot);wakes.add(pending);void pending.finally(()=>wakes.delete(pending));
+            const snapshot=await identity(input);const wakeStart=await processStart(process.pid);const queued=commands.enqueue(input,wakeStart);const pending=queued.reused?Promise.resolve():wake(input,snapshot);wakes.add(pending);void pending.finally(()=>wakes.delete(pending));
             return json({...commands.public(queued.command),reused:queued.reused},202);
           }
           if(url.pathname==='/api/v1/diagnostic'&&req.method==='POST'){
             const input=z.object({ownerThread:z.string().uuid(),project:z.string().min(1),peerId:z.string().uuid().optional()}).strict().parse(await body(req));
             if(options.ownerThread&&options.ownerThread!==input.ownerThread)throw new Error('Wrong conversation');
             const report=await doctor({project:input.project,threadId:input.ownerThread,peerId:input.peerId,configDir:options.configDir,codexHome:options.codexHome,pluginRoot:options.pluginRoot});
-            return json({state:report.state,checks:report.checks.map(c=>({code:c.code,level:c.level,message:c.code==='runtime'?`Runtime ${version}: ${c.level}`:c.message,remedy:c.remedy})),settingsModified:false,messagesSent:false});
+            return json({state:report.state,checks:report.checks.map(c=>({code:c.code,level:c.level,message:c.code==='runtime'?`Bun ${Bun.version}; distribution ${version}`:c.message,remedy:c.remedy})),settingsModified:false,messagesSent:false});
           }
           const match=url.pathname.match(/^\/api\/v1\/runs\/([\da-f-]{36})(?:\/(events|stream|export))?$/i);
           if(match&&req.method==='GET'){
@@ -143,6 +168,6 @@ export function startPanel(options:Options){
       }catch(error){return json({error:error instanceof Error?error.message:'Panel request failed'},409);}
     }});
   return {url:`http://127.0.0.1:${server.port}/#token=${token}`,origin:`http://127.0.0.1:${server.port}`,store,commands,
-    async reconcileCommand(id:string){const command=commands.get(id);if(command?.state!=='unknown')return;const inputs=await readDesktopInputs(options.ipcPath,command.owner);if(inputs.consumed.some(i=>i.clientId===command.input_id))commands.consumed(id);},
+    async reconcileCommand(id:string){const command=commands.get(id);if(command)await reconcile([command]);},
     async close(){if(closed)return;closed=true;for(const stop of streams)stop();await server.stop(true);await Promise.allSettled([...wakes]);store.close();commands.close();authorizations.close();}};
 }
