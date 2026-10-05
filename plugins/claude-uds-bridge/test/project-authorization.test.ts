@@ -1,4 +1,4 @@
-import {test,expect} from 'bun:test';
+import {test,expect,spyOn} from 'bun:test';
 import {mkdtempSync,mkdirSync,symlinkSync,renameSync,rmSync,statSync} from 'node:fs';
 import {join} from 'node:path';
 import {randomUUID} from 'node:crypto';
@@ -63,4 +63,16 @@ test('revocation also covers barrier-buffered replies and preserves an explicit 
   await f.call(c,'collaboration_report',{runId,reportId:randomUUID(),report:{kind:'response',taskId:ownTask,declaredState:'analysis'},text:'Own initial analysis'});await Bun.sleep(1150);expect(f.desktop.submissions).toHaveLength(0);
   await f.call(c,'collaboration_cancel',{runId});await f.bridge.setPolicy('accept');expect(f.bridge.policy()).toBe('accept');expect(auth.status(f.root).enabled).toBe(false);
  }finally{auth.close();await c.close();await f.close();}
+});
+
+
+test('revocation between routing decision and delivery entry cannot leave a stale acceptance',async()=>{
+ const x=await running();const original=ProjectAuthorizations.prototype.allows;let revoked=false;
+ const lookup=spyOn(ProjectAuthorizations.prototype,'allows').mockImplementation(function(this:ProjectAuthorizations,path:string,receivedAt:number){
+  const allowed=original.call(this,path,receivedAt);
+  if(allowed&&!revoked){revoked=true;x.authorizations.change({project:x.f.root,ownerThread:x.f.desktop.threadId,actionId:randomUUID(),enabled:false,expectedRevision:1,confirmed:true});}
+  return allowed;
+ });
+ try {x.grant();await Bun.sleep(3);await x.send('REVOKED_DURING_ROUTE');await until(()=>revoked);await until(()=>x.f.bridge.runs.status(x.id,x.f.desktop.threadId).messages.some(m=>m.direction==='in'&&['held','denied'].includes(m.status)));expect(x.f.desktop.submissions).toHaveLength(0);expect(x.f.bridge.policy()).toBe('default');}
+ finally{lookup.mockRestore();await x.close();}
 });

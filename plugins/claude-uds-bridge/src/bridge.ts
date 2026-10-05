@@ -421,7 +421,7 @@ export class Bridge {
 
   private async route(message: Message) {
     const decision = this.decision(message);
-    if (decision === 'accept') { await this.deliver(message); return; }
+    if (decision === 'accept') { await this.deliver(message, true); return; }
     if (message.kind === 'idle-notice') {
       this.db.run("UPDATE messages SET status=?,text='' WHERE id=? AND status='pending'",
         [decision === 'hold' ? 'recorded' : 'refused', message.id]);
@@ -615,8 +615,10 @@ export class Bridge {
     catch { return peer_id; }
   }
 
-  private async deliver(message: Message) {
-    const inherited=this.policy()==='default'&&this.projectAllows(message);
+  private async deliver(message: Message, recheckPolicy=false) {
+    // Capture the routing requirement, not a second observation of a grant:
+    // another process can revoke between route() and this entry point.
+    const checkPolicy=recheckPolicy||message.status==='buffered';
     if(message.status==='buffered'&&this.decision(message)!=='accept'){this.db.run("UPDATE messages SET status='pending' WHERE id=? AND status='buffered'",[message.id]);await this.route(message);return;}
     if(message.kind==='message'){const gate=this.runs.authorizeIncoming(message.id);
       if(gate==='buffer'){this.db.run("UPDATE messages SET status='buffered' WHERE id=? AND status IN ('pending','held','buffered')",[message.id]);return;}
@@ -659,7 +661,7 @@ export class Bridge {
         }
       }
       // Recheck after native/project inspection: revocation must cover queued deliveries.
-      if(inherited&&this.decision(message)!=='accept') {
+      if(checkPolicy&&this.decision(message)!=='accept') {
         this.db.run("UPDATE messages SET status='pending',awaiting_input=0,desktop_input_id=NULL WHERE id=? AND status='submitting'",[message.id]);
         await this.route(message);return;
       }
