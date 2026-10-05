@@ -42,6 +42,7 @@ test('work envelopes reject forged author fields, malformed metadata and review 
  const task:Task={taskId:randomUUID(),intent:'discuss'};expect(parseWork(formatWork(task,'Question'))?.work).toMatchObject(task);
  expect(()=>parseWork('CC_CDX_WORK_V1 {"kind":"response","author":"codex","declaredState":"done"}\ntext')).toThrow();
  expect(()=>formatWork({taskId:randomUUID(),intent:'review'},'Review')).toThrow('exact');
+ expect(()=>parseWork('CC_CDX_WORK_V1 {"kind":"response","declaredState":"done","verdict":"agree"}\ntext')).toThrow();
  expect(parseWork('A normal answer')).toBeNull();
  expect(()=>parseWork('CC_CDX_WORK_V1 broken\ntext')).toThrow();
 });
@@ -145,7 +146,7 @@ test('real MCP/socket fixture supports mixed guided review, exact draft transpor
   const resultId=randomUUID();await call('collaboration_report',{runId,reportId:randomUUID(),report:{kind:'result',resultId,version:1,title:'Pinned draft'},text:'Specific draft content'});
   const messageId=randomUUID(),taskId=randomUUID();const sent=await call('collaboration_send',{runId,messageId,text:'Review this draft',task:{taskId,intent:'review',target:{resultId,version:1}}});expect(sent.error).not.toBe(true);
   await until(()=>f.frames.some(frame=>frame.type==='user'));const frame=f.frames.find(frame=>frame.type==='user')!;if(frame.type!=='user')throw new Error('Missing user frame');
-  expect(frame.message.content).toContain('Specific draft content');expect(frame.message.content).toContain('Orientación de colaboración');expect(parseManaged(frame.message.content)?.header.runId).toBe(runId);
+  expect(frame.message.content).toContain('Para kind=review adapta únicamente verdict');expect(frame.message.content).toContain('No añadas declaredState');expect(frame.message.content).toContain('Specific draft content');expect(frame.message.content).toContain('Orientación de colaboración');expect(parseManaged(frame.message.content)?.header.runId).toBe(runId);
   await f.respond(runId,messageId,{kind:'review',taskId,resultId,version:1,verdict:'disagree',disagreements:['Missing a concrete check']},'Peer identifies a risk');await until(()=>f.desktop.submissions.length===1);
   await until(()=>f.bridge.runs.status(runId,f.desktop.threadId).reviews.length===1);
   await c.close();c=await f.connect();const restored=await call('collaboration_status',{runId});expect(restored.data.reviews[0].author).toBe(f.peerId);expect(restored.data.state).toBe('active');
@@ -163,4 +164,29 @@ test('phase 2 capability gate rejects an older receiver; MCP guide remains read-
   const prepared=await call('collaboration_prepare',{requestId:randomUUID(),peerId:f.peerId,context});const runId=prepared.data.id;await call('collaboration_start',{runId,supervised:true});await call('collaboration_cancel',{runId});
   expect((await call('collaboration_send',{runId,messageId:randomUUID(),text:'No work after cancel',task:{taskId:randomUUID(),intent:'analyze'}})).error).toBe(true);expect(f.frames).toHaveLength(0);
  }finally{await c.close();await f.close();}
+});
+
+// A fresh Claude chat mixed verdict into a response after the former common guidance.
+// Keep strict admission; verify that the response template can be copied and delivered.
+test('analysis reply template uses only response fields and its copied envelope is admitted',async()=>{
+ const f=await nativeFixture();const client=await f.connect();try{
+  const prepared=await f.call(client,'collaboration_prepare',{requestId:randomUUID(),peerId:f.peerId,context:{objective:'Check response contract'},limits:{maxMessages:4,maxSeconds:60}});
+  expect(prepared.error).toBeFalsy();const runId=prepared.data.id;
+  expect((await f.call(client,'collaboration_start',{runId,supervised:true})).error).toBeFalsy();
+  const messageId=randomUUID(),taskId=randomUUID();
+  expect((await f.call(client,'collaboration_send',{runId,messageId,text:'Analyze briefly',task:{taskId,intent:'analyze'}})).error).toBeFalsy();
+  await until(()=>f.frames.some(frame=>frame.type==='user'));
+  const frame=f.frames.find(frame=>frame.type==='user')!;if(frame.type!=='user')throw new Error('Missing user frame');
+  const wire=frame.message.content;
+  const template=wire.split('\n').find(line=>line.startsWith('CC_CDX_WORK_V1 {"kind":"response"'));
+  expect(template).toBeDefined();const parsed=parseWork(template+'\nCopied template answer');
+  expect(parsed?.work).toEqual({kind:'response',taskId,declaredState:'analysis',disagreements:[]});
+  expect(wire).toContain('Para kind=response adapta únicamente declaredState');
+  expect(wire).toContain('No añadas verdict');expect(wire).not.toContain('Adapta verdict (agree/revise/disagree), declaredState');
+  if(!parsed||parsed.work.kind==='task')throw new Error('Missing response');
+  await f.respond(runId,messageId,parsed.work,parsed.text);await until(()=>f.desktop.submissions.length===1);
+  await until(()=>f.bridge.runs.status(runId,f.desktop.threadId).reports.length===1);
+  const status=await f.call(client,'collaboration_status',{runId});
+  expect(status.data.reports[0].report.kind).toBe('response');expect(status.data.reports[0].author).toBe(f.peerId);
+ }finally{await client.close();await f.close();}
 });

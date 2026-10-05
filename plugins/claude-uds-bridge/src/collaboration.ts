@@ -54,7 +54,10 @@ export class Collaboration {
     const replyHeader='CC_CDX_RUN_V1 '+JSON.stringify({runId:id,contextVersion:run.contextVersion,messageId:randomUUID(),replyTo:messageId});
     const structuredReply=task?'\nPara una respuesta estructurada, copia también esta segunda línea y escribe tu texto después:\n'
       +'CC_CDX_WORK_V1 '+JSON.stringify(task.intent==='review'?{kind:'review',taskId:task.taskId,...task.target,verdict:'revise',disagreements:[]}:{kind:'response',taskId:task.taskId,declaredState:task.intent==='analyze'?'analysis':'perspective',disagreements:[]})
-      +'\nAdapta verdict (agree/revise/disagree), declaredState (analysis/perspective/needs_input/blocked/done) y disagreements a tus conclusiones. Son declaraciones tuyas, no estados del núcleo. Puedes proponer un resultado con kind=result, taskId, resultId UUID nuevo, version=1, title y disagreements. No añadas author ni permisos.':'';
+      +'\n'+(task.intent==='review'
+        ?'Para kind=review adapta únicamente verdict (agree/revise/disagree) y disagreements; conserva taskId, resultId y version. No añadas declaredState.'
+        :'Para kind=response adapta únicamente declaredState (analysis/perspective/needs_input/blocked/done) y disagreements; conserva taskId. No añadas verdict, resultId, version ni title: corresponden a otros tipos de informe.')
+      +' Son declaraciones tuyas, no estados del núcleo. Si eliges proponer un resultado, sustituye la segunda línea completa por kind=result con exclusivamente taskId, resultId UUID nuevo, version=1, title y disagreements. No mezcles campos entre tipos; no añadas author ni permisos.':'';
     const wire=formatManaged(header, prompt+`\n\nContexto compartido (versión ${run.contextVersion}):\n`+JSON.stringify(run.context)+(run.coordination?'\nControl estructurado: '+JSON.stringify({phase:run.coordination.phase,contextVersion:run.contextVersion,barrierOpen:run.coordination.barrierOpen})+'. El controlador conserva los informes iniciales en privado hasta abrir la barrera.':'')
       +(run.routine?'\n\nOrientación de colaboración:\n'+JSON.stringify(guide(run.routine)):'')
       +'\n\nPara registrar una respuesta, usa SendMessage al nombre de Codex indicado en este mensaje. Puedes copiar esta primera línea de un solo uso:\n'

@@ -72,7 +72,7 @@ La evidencia previa de fase 4 se puede reutilizar indicando fecha y versión. No
 - [x] Ensayos nativos y UI ejecutados; inventario L01–L18 con pendientes explícitos.
 - [x] CI de fuente/bundles en Linux y macOS.
 - [x] Reapertura completa de apps con MCP y receptor 0.7.0, historial y autorización conservados.
-- [ ] Casos nativos de chats nuevos/nombres iguales (L06/L17), pendientes de autorización explícita.
+- [ ] Cierre de casos nativos L06/L17: autorización recibida, dos chats temporales creados; repetir tras corregir formato de respuesta y archivar al terminar.
 - [x] Notas del piloto y guía de recuperación en PILOTO.md.
 - [x] Instalación local 0.7.0 y recarga supervisada de receptores; políticas y autorización preservadas.
 
@@ -129,9 +129,31 @@ CI Linux/macOS del arreglo visual final aprobada sobre `9c474c7`: [ejecución 37
 
 Pendientes y reglas de continuación:
 
-1. L06/L17 necesitan crear chats temporales de Codex/Claude; hay una pregunta asíncrona pendiente para autorizarlos y archivarlos después. «Listo» confirma la reapertura solicitada, no concede aquella autorización distinta. No crear chats hasta recibir respuesta explícita.
+1. El usuario respondió «sí»: autorizó crear un chat temporal de Codex y otro de Claude para L06/L17 y archivarlos después. Ambos ya existen. No crear más chats para resolver este ensayo; usar las identidades exactas de la evidencia privada de continuación.
 2. L08 nativo de retención/denegación sigue histórico de fase 4; regresiones automatizadas actuales prueban política explícita. No cambiar permisos reales para repetirlo sin autorización específica.
 3. Conservar todos los runs cerrados y sus IDs; no repetir órdenes ni liberar respuestas tardías. Usar IDs nuevos en cualquier nuevo ensayo.
 4. Mantener autorización recordada y políticas; no revocar ni borrar bases para pruebas.
 5. Actualizar evidencia saneada y registrar CI de cualquier arreglo nuevo. No declarar la matriz completa ni fase 5 cerrada antes de resolver los ensayos pendientes.
 6. No se abrió PR ni release de fase 5. La rama sigue `feature/phase-5-pilot-hardening`.
+
+
+## Continuidad L06/L17 — 5 de octubre de 2026
+
+La autorización humana ya está recibida. El chat nuevo de Codex arrancó con receptor y MCP 0.7.0, política `default` y autorización por carpeta recordada; no se usó attach manual. El chat temporal de Claude se creó en la misma carpeta y se renombró igual que el anterior, conservando el anterior intacto.
+
+La UI original mostraba dos opciones idénticas. Se corrigió el selector: los homónimos del mismo proveedor muestran un prefijo único de su ID, ampliado si colisiona. La comprobación visual mostró dos sufijos distintos y el valor seleccionado correspondía al nuevo Claude. Diagnóstico y autorización usan la misma regla.
+
+El primer ensayo `REAL_P5_NEW_705` creó una orden aplicada y dos mensajes con las identidades nuevas correctas. La respuesta añadió `verdict` a `kind=response`: quedó `unclassified`, denegada, sin entrada al modelo. No demuestra recepción heredada. El intento alcanzó su plazo; se conserva como `limit_reached` y no se reabre ni libera su contenido. La petición de una tarea correctiva llegó después del plazo y no se envió. El chat Codex terminó descargado/interrumpido; no atribuirle un cierre con propuesta.
+
+Se corrigió la causa de orientación: la plantilla indica por separado los campos de respuesta y revisión. Se conserva la validación estricta. La regresión MCP/socket copia la plantilla real de respuesta y comprueba su admisión, autoría y entrega; también rechaza una respuesta con `verdict` y comprueba la guía específica de revisión. Suites posteriores fuente/bundle: 136 pruebas, 0 fallos, 1051 aserciones cada una. Al ejecutar con umask 077 se detectó que el fixture de directorio inseguro no forzaba su modo 0755; se corrigió con chmod explícito y pasó sin tocar permisos reales.
+
+El control de las apps informó que el Mac estaba bloqueado. Hay una petición pendiente para desbloquearlo; no se intenta saltar el bloqueo. La UI del panel en IAB sigue accesible; el archivado nativo de Claude depende de ese desbloqueo.
+
+Pasos siguientes, sin nueva aprobación:
+
+1. Verificar que el Mac está desbloqueado. Reutilizar el panel local y los dos chats temporales; sus IDs y el enlace privado están en `.local/phase5/` y en el registro vivo. No abrir sesiones CLI de modelos.
+2. Inspeccionar descubrimiento y políticas. Mantener `default` del chat Codex y grant revisión 1; los nombres no identifican sesiones. El panel actualizado y backend corregido están instalados en cache 0.7.0; un proceso MCP vivo anterior puede necesitar recarga.
+3. Crear un ensayo nuevo con IDs nuevos, una tarea breve, máximo cuatro mensajes y diez minutos (el intento anterior no se reintenta). Especificar el esquema response sin verdict y respetar la plantilla. No modificar el checkout durante el run.
+4. Comprobar respuesta admitida y consumida exactamente una vez por el nuevo Codex, orden aplicada/consumida una vez, ninguna nueva fila para el Claude antiguo, hash de settings igual a línea base, grant y políticas intactos. Guardar exportación/evidencia privada; no copiar texto denegado al modelo.
+5. Cerrar el ensayo, archivar exactamente los dos chats temporales, confirmar limpieza y actualizar L06/L17 solo si estas pruebas pasan. L08 nativo actual sigue distinto de la evidencia histórica.
+6. Publicar commit/CI del arreglo y actualizar plan/evidencia saneada. No hay autorización nueva de PR/fusión de fase 5.

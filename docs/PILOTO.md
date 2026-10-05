@@ -1,6 +1,6 @@
 # Piloto 0.7.0: uso y recuperación
 
-Candidata local en `feature/phase-5-pilot-hardening`, sin release ni fusión; rama publicada para CI. Plan y evidencia: [FASE_5.md](FASE_5.md) y [PILOT_EVIDENCE.json](PILOT_EVIDENCE.json). Reapertura completa de apps, pausa/contexto y continuación real verificadas con 0.7.0; los ensayos de chats nuevos y nombres iguales siguen pendientes de autorización explícita.
+Candidata local en `feature/phase-5-pilot-hardening`, sin release ni fusión; rama publicada para CI. Plan y evidencia: [FASE_5.md](FASE_5.md) y [PILOT_EVIDENCE.json](PILOT_EVIDENCE.json). Reapertura completa de apps, pausa/contexto y continuación real verificadas con 0.7.0; los ensayos de chats nuevos y nombres iguales están autorizados y en curso. El primer ensayo rechazó una respuesta con formato inválido; se corrigió la guía y queda pendiente la repetición válida y limpieza.
 
 ## Cambios
 
@@ -9,7 +9,8 @@ Candidata local en `feature/phase-5-pilot-hardening`, sin release ni fusión; ra
 - El diagnóstico distingue política explícita, autorización por carpeta y versión/capacidades del receptor vivo. Actualizar archivos no sustituye procesos ya abiertos.
 - La UI mantiene accesibles los objetivos largos sin desplazar todo el resultado, y distingue cierre sin resultado de una espera activa. Muestra la versión del servicio conectado y actualiza el aviso de control hasta «Aplicada» al confirmar su orden. Una entrega incierta aparece como incidencia sin indicador de trabajo infinito.
 - Verificador con CLI real: actualización desde 0.6.1, hashes, PATH reducido, desinstalación y reinstalación conservando bases privadas.
-- Regresiones de reinicios, credenciales antiguas, alias iguales, espacios/Unicode y worktrees.
+- Regresiones de reinicios, credenciales antiguas, alias iguales, espacios/Unicode y worktrees. El selector diferencia chats homónimos mediante un sufijo único.
+- Plantillas de respuesta y revisión con campos separados: una respuesta de análisis no lleva verdict. El formato estricto sigue aplicándose.
 - Resúmenes compartibles por lista permitida; las exportaciones completas siguen privadas.
 
 ## Compatibilidad

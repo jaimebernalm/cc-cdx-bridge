@@ -47,12 +47,12 @@
     {
       "check": "source_suite",
       "passed": true,
-      "count": 135
+      "count": 136
     },
     {
       "check": "bundle_suite",
       "passed": true,
-      "count": 135
+      "count": 136
     },
     {
       "check": "panel_restart",
