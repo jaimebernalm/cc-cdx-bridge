@@ -6,14 +6,15 @@ import { spawn } from 'node:child_process';
 export class PanelOpening {
   private opened = new Map<string, Promise<{requested: boolean; error?: string}>>();
   constructor(private launch = launchLocalBrowser) {}
-  open(key: string, url: string, enabled = true, force = false) {
+  open(key: string, url: string, enabled = true, force = false): Promise<{requested: boolean; error?: string}> {
     if (!enabled || process.env.CC_CDX_PANEL_AUTO_OPEN === '0') return Promise.resolve({requested: false});
     const previous = this.opened.get(key); if (previous && !force) return previous;
-    const pending = this.launch(url).then(() => ({requested: true}), () => ({requested: false, error: 'No se pudo abrir el navegador. Abre el enlace privado del panel.'}));
+    // A launcher that throws synchronously still reports {requested:false} instead of escaping.
+    const pending = Promise.resolve().then(() => this.launch(url)).then(() => ({requested: true}), () => ({requested: false, error: 'No se pudo abrir el navegador. Abre el enlace privado del panel.'}));
     this.opened.set(key, pending); return pending;
   }
 }
-function launchLocalBrowser(url: string): Promise<void> {
+async function launchLocalBrowser(url: string): Promise<void> {
   const parsed = new URL(url);
   if (parsed.protocol !== 'http:' || parsed.hostname !== '127.0.0.1') throw new Error('Only the private local panel can be opened');
   const command = process.platform === 'darwin' ? 'open' : process.platform === 'linux' && (process.env.DISPLAY || process.env.WAYLAND_DISPLAY) ? 'xdg-open' : null;

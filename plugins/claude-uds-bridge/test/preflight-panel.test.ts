@@ -68,7 +68,7 @@ test('panel launch dispatch is once per action; failure retains a usable deep li
  await Promise.all([opening.open('start',url),opening.open('start',url)]);expect(launches).toHaveLength(1);expect(new URL(url).hash).toContain('run=');expect(new URL(url).hash).toContain('token=private');
  expect(await opening.open('no-open',url,false)).toEqual({requested:false});expect(launches).toHaveLength(1);
  await opening.open('start',url,true,true);expect(launches).toHaveLength(2);
- const failed=new PanelOpening(async()=>{throw new Error('No browser')});expect((await failed.open('start',url)).requested).toBe(false);
+ const failed=new PanelOpening(async()=>{throw new Error('No browser')});expect((await failed.open('start',url)).requested).toBe(false);const thrown=new PanelOpening(()=>{throw new Error('Only the private local panel can be opened')});expect(await thrown.open('sync',url)).toEqual({requested:false,error:'No se pudo abrir el navegador. Abre el enlace privado del panel.'});
 });
 test('refresh publishes the current detail even when another section is slow or fails',async()=>{
  const seen:string[]=[];let release!:()=>void;const pending=new Promise<void>(resolve=>{release=resolve});
