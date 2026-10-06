@@ -725,6 +725,8 @@ test('automatic dialogs cancel on expiry and transport failures leave messages h
   } finally { await client.close(); await f.close(); }
 });
 
+// Spawns a real MCP server process and waits on a receiver-owned deadline; hosted macOS
+// runners need more than Bun's default 5 s for the whole scenario.
 test('MCP cancellation leaves policy alone but denies a default-held message', async () => {
   const f = await fixture();
   let action: 'accept' | 'cancel' = 'cancel';
@@ -763,7 +765,7 @@ test('MCP cancellation leaves policy alone but denies a default-held message', a
     await client.close();
     await until(() => f.bridge.status().messages.find(row => row.id === deadlineMessage)?.status === 'expired');
   } finally { await client.close(); await f.close(); }
-});
+}, 20000);
 
 test('text frames with priority now or later are delivered like next', async () => {
   const f = await fixture();
