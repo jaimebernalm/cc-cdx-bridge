@@ -109,7 +109,10 @@ export function startPanel(options:Options){
     async fetch(req):Promise<Response>{const url=new URL(req.url),origin=`http://127.0.0.1:${server.port}`,cookieName=`cc_cdx_panel_${server.port}`;
       if(req.headers.get('host')!==`127.0.0.1:${server.port}`||url.origin!==origin)return json({error:'Invalid Host'},403);
       const requestOrigin=req.headers.get('origin');if(requestOrigin&&requestOrigin!==origin)return json({error:'Invalid Origin'},403);
-      if(req.headers.get('sec-fetch-site')==='cross-site')return json({error:'Cross-site request rejected'},403);
+      // A top-level navigation to the page itself (e.g. from a browser extension or another app) is harmless:
+      // the API below still rejects cross-site requests and the Strict session cookie is never sent cross-site.
+      const pageNavigation=req.method==='GET'&&!url.pathname.startsWith('/api/')&&req.headers.get('sec-fetch-mode')==='navigate';
+      if(req.headers.get('sec-fetch-site')==='cross-site'&&!pageNavigation)return json({error:'Cross-site request rejected'},403);
       try{
         if(url.pathname==='/api/v1/session'&&req.method==='POST'){
           if(requestOrigin!==origin)return json({error:'Session requires same origin'},403);

@@ -20,6 +20,10 @@ test('panel guards tokens, Origin, CSRF, paths and preserves existing private ru
  expect((await fetch(x.p.origin+'/api/v1/session',{method:'POST',headers:{Origin:x.p.origin},body:JSON.stringify({token:'invalid'})})).status).toBe(401);
  expect((await fetch(x.p.origin+'/src/panel.ts')).status).toBe(404);
  expect((await fetch(x.p.origin+'/')).headers.get('Content-Security-Policy')).toContain("frame-ancestors 'none'");
+ // Opening the page from another app or extension shows the panel; the API stays same-site only.
+ expect((await fetch(x.p.origin+'/',{headers:{'Sec-Fetch-Site':'cross-site','Sec-Fetch-Mode':'navigate'}})).status).toBe(200);
+ expect((await x.call('runs',undefined,{'Sec-Fetch-Site':'cross-site','Sec-Fetch-Mode':'navigate'})).status).toBe(403);
+ expect((await fetch(x.p.origin+'/',{headers:{'Sec-Fetch-Site':'cross-site','Sec-Fetch-Mode':'no-cors'}})).status).toBe(403);
  const oldToken=new URL(x.p.url).hash.slice(7),freshToken=new URL(x.p.reopenUrl()).hash.slice(7);expect(freshToken).not.toBe(oldToken);expect((await x.call('health')).status).toBe(200);const exchange=(token:string)=>fetch(x.p.origin+'/api/v1/session',{method:'POST',headers:{Origin:x.p.origin},body:JSON.stringify({token})});expect((await exchange(oldToken)).status).toBe(401);expect((await exchange(freshToken)).status).toBe(200);expect((await exchange(freshToken)).status).toBe(401);
  expect((await x.call('participants')).status).toBe(200);expect(await (await x.call('runs')).json()).toEqual([]);
  const huge='x'.repeat(262145);expect((await fetch(x.p.origin+'/api/v1/commands',{method:'POST',headers:{Cookie:x.cookie,Origin:x.p.origin,'X-CSRF-Token':x.csrf},body:huge})).status).toBe(409);
