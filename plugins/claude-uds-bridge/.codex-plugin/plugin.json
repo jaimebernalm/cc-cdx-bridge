@@ -1,6 +1,6 @@
 {
   "name": "claude-uds-bridge",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "Coordinate Desktop agents with nine optional routines, exact-version reviews and scoped Git implementation candidates.",
   "author": {
     "name": "Jaime Bernal (fork of Leon Kohli)"

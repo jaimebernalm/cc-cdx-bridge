@@ -1,4 +1,5 @@
 import { Bridge } from './bridge';
+import { receptionPreflight, requireReception } from './preflight';
 import { formatManaged } from './managed-message';
 import { compareProjects } from './project';
 import { discoverParticipants, inspectParticipant, sameScopedSnapshot, type ParticipantOptions } from './participants';
@@ -34,8 +35,10 @@ export class Collaboration {
     }
     if(plan)await captureImplementation(plan,this.store.status(id,this.owner).contextVersion);
   }
+  async preflight(peerId: string) { return receptionPreflight(this.options,this.owner,peerId); }
   async start(id: string, allowBusyPeer=false) {
     const existing=this.store.status(id,this.owner);
+    requireReception(await this.preflight(this.store.participants(id).find(p=>p.provider==='claude')!.sessionId));
     if (existing.state==='active') return existing;
     await this.validate(id,allowBusyPeer); return this.store.start(id,this.owner);
   }
@@ -49,6 +52,7 @@ export class Collaboration {
     try { await this.validate(id,true); }
     catch (error) { this.store.block(id,'participant_or_project_changed'); throw error; }
     const peer=this.store.participants(id).find(p=>p.provider==='claude')!;
+    requireReception(await this.preflight(peer.sessionId));
     const race=this.store.reserveOutgoing(id,this.owner,messageId,peer.sessionId,text,replyTo,task);
     if (race) return {reused:true,message:race};
     const run=this.store.status(id,this.owner);

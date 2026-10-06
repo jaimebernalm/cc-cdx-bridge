@@ -1,12 +1,10 @@
 # CC–CDX Bridge
 
-Fork maintained at [jaimebernalm/cc-cdx-bridge](https://github.com/jaimebernalm/cc-cdx-bridge), based on [Leon Kohli's Claude UDS Bridge](https://github.com/LeonKohli/claude-uds-bridge). Version 0.6.0 adds an authenticated local shadcn/ui panel to create, follow, control and export collaborations through the selected Desktop chat's real tools. It retains the optional structured coordination from 0.5.0 and the 0.4.1 transport corrections. The initial barrier withholds current-run analyses; it does not erase chat history. Reviews are attributed declarations, never certified consensus. See [phase 4](docs/FASE_4.md), [phase 3](docs/FASE_3.md) and the [compatibility and reception decision](docs/COMPATIBILIDAD.md).
+Fork maintained at [jaimebernalm/cc-cdx-bridge](https://github.com/jaimebernalm/cc-cdx-bridge), based on [Leon Kohli's Claude UDS Bridge](https://github.com/LeonKohli/claude-uds-bridge). Version 0.9.0 adds the same managed collaboration tools to Codex Desktop and Claude Code Desktop. Either chat can initiate, choose an exact existing peer, or request a new chat through a separately authorized creation ticket. The local panel opens privately, refreshes persistent work, and defaults to English with a Spanish selector.
 
-A Codex plugin that lets Codex tasks and Claude Code sessions message each other on one machine.
+The distribution contains a Codex plugin and a separate Claude Code plugin. Each includes an MCP server, instructions and lifecycle hooks. The older Codex tools remain available for compatibility; use `desktop_collaboration_*` for the new two-way workflow. See [the approved design](docs/INICIO_BIDIRECCIONAL.md), [current implementation and acceptance evidence](docs/BIDIRECTIONAL_DESKTOP.md), and [the real Claude identity measurements](docs/CLAUDE_SPIKE.md).
 
-Claude Code can already list its other sessions and send one of them a message by name. This plugin registers your Codex task in the same local registry, so Claude finds the task with `ListAgents` and writes to it with `SendMessage`. No handshake, no tool call first. From the Codex side, a bundled MCP server lists the live agents and sends to one of them.
-
-The bridge transports messages over Unix domain sockets in a private per-user directory. Once a message reaches an agent, the app processes it using that agent's configured model provider. Local transport does not mean local model inference.
+Messages travel over local Unix sockets and Codex Desktop IPC. The configured models still run through their respective providers. Peer messages grant no permission to edit, execute or publish; reviews and test receipts are attributed declarations, never certified consensus.
 
 ## Requirements
 
@@ -34,6 +32,26 @@ After publishing this version, the equivalent Git marketplace installation is:
 codex plugin marketplace add jaimebernalm/cc-cdx-bridge
 codex plugin add claude-uds-bridge@jaimebernalm
 ```
+
+## Install the Claude Desktop side
+
+Use the separate plugin root, so Claude does not load Codex-specific hooks:
+
+```bash
+cd /absolute/path/to/cc-cdx-bridge
+claude plugin marketplace add ./plugins/cc-cdx-bridge-claude --scope local
+claude plugin install cc-cdx-bridge@cc-cdx-bridge-local --scope local
+```
+
+Install and trust the hooks yourself, then reload the plugin in Claude Desktop or open a new local Code chat in this folder. An existing chat may keep its previous MCP process. `caller_status` checks its native identity; `desktop_collaboration_discover` checks the live two-way endpoints. Starting or listing the Claude server tools advertises private presence without opening the shared collaboration database. The first collaboration operation initializes it.
+
+## Everyday two-way workflow
+
+In either app, ask: “Collaborate with the other agent on this objective, use this exact chat or request a new one, with 20 messages and 20 minutes.” The agent discovers the exact peer, checks reception and prepares a durable run. The panel opens privately; no browser token is returned to the model. A missing capability calls for reloading that chat, not changing its identity or substituting a CLI agent.
+
+A remembered project reception grant covers managed Claude replies to Codex-origin work. It does not authorize a new Claude-origin task. For that task, the panel can consent to the exact run; explicit `hold` or `refuse` still wins. Creating a new chat has its own ticket and optional revocable creation grant. Claude creation can use an opt-in assisted UI adapter; new Codex creation uses the official host tool of a live, panel-delegated Codex chat or manual opening. A returned chat ID alone is not proof of a binding.
+
+Watch persistent context, tasks, messages, attributed reviews and deadlines in **Two-way Desktop**. Pause, finish, cancel or export there. An uncertain delivery or creation is preserved and never repeated automatically. After model compaction, the agent reads the same stored context and work instead of relying on memory alone.
 
 ## Check that it works
 
@@ -227,3 +245,11 @@ Para escritura coordinada, prepara un contrato explícito sobre una base Git com
 Los tests y veredictos de los agentes siguen siendo declaraciones; la preparación verifica condiciones técnicas, no consenso. Se requieren receptores con `implementation_v1`: actualizar archivos no recarga procesos vivos. [Workflow y API de implementación](plugins/claude-uds-bridge/skills/bridge-collaboration/references/implementation.md).
 
 Piloto nativo validado en macOS con Codex y Claude Desktop: escritura en worktrees separados, integración de la versión corregida con 31 pruebas aprobadas, revisión atribuida a esa versión y descarga real del parche desde el panel. Un cambio posterior invalida la preparación y el panel muestra el rechazo de descarga. La prueba conserva permisos, ajustes e índices originales; no publica cambios ni certifica consenso. La candidata está instalada localmente; todavía requiere revisión y CI de su PR.
+
+### Inicio y panel en 0.8.1
+
+Antes de empezar, `collaboration_preflight` comprueba la recepción del chat y la autorización de su carpeta. Un chat con `default` necesita una autorización recordada utilizable; `hold`/`refuse` explícitos mantienen su prioridad. El MCP no cambia permisos. Si el diálogo de `inbox` no se confirma, se usa la autorización del panel sin interpretar `decline` como una elección humana. Los mensajes denegados no se recuperan.
+
+Preparar/iniciar devuelve el enlace privado de la colaboración y solicita abrir el navegador local. `openPanel:false` desactiva esa apertura; `CC_CDX_PANEL_AUTO_OPEN=0` permite uso sin escritorio. El agente puede mostrar el enlace en el navegador de Codex. La página actualiza secciones independientemente y muestra la última actualización, con reconexión y botón Actualizar. Si se detiene el servicio, abre el enlace nuevo que devuelva el MCP; el enlace anterior no se recicla. Detalles y validación: [RECEPCION_Y_PANEL.md](docs/RECEPCION_Y_PANEL.md).
+
+El panel abre en inglés por defecto. El selector **Language / Idioma** permite elegir **English** o **Español** sin perder el formulario ni cambiar la colaboración. La elección se recuerda al recargar ese panel en el mismo navegador; un servicio con otra dirección local empieza en inglés. El idioma de la interfaz no traduce las aportaciones de los agentes.

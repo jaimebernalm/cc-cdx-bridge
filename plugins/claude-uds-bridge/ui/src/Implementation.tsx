@@ -1,3 +1,4 @@
+import {t} from './lib/i18n';
 import { useEffect, useState } from "react";
 import { Download, GitBranch, RefreshCw } from "lucide-react";
 import {
@@ -115,7 +116,7 @@ export function ImplementationOptions({
     <Card className="mb-6">
       <CardHeader>
         <div className="flex items-center justify-between gap-4">
-          <CardTitle>Preparar cambios coordinados</CardTitle>
+          <CardTitle>{t("Preparar cambios coordinados")}</CardTitle>
           <Switch
             id="write-contract"
             checked={enabled}
@@ -124,23 +125,16 @@ export function ImplementationOptions({
           />
         </div>
         <CardDescription>
-          <Label htmlFor="write-contract">
-            Activar un reparto explícito de archivos y comprobaciones.
-          </Label>{" "}
-          Elegir un uso por sí solo no habilita escritura.
-        </CardDescription>
+          <Label htmlFor="write-contract">{t("Activar un reparto explícito de archivos y comprobaciones.")} </Label>{" "}{t("Elegir un uso por sí solo no habilita escritura.")} </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
         {!supported && (
-          <p className="text-xs text-muted-foreground">
-            Reabre el receptor actualizado de este chat para configurar
-            implementación.
-          </p>
+          <p className="text-xs text-muted-foreground">{t("Reabre el receptor actualizado de este chat para configurar implementación.")} </p>
         )}
         {enabled && (
           <>
             <div>
-              <Label htmlFor="write-strategy">Distribución</Label>
+              <Label htmlFor="write-strategy">{t("Distribución")}</Label>
               <NativeSelect
                 id="write-strategy"
                 className="mt-2 w-full"
@@ -149,19 +143,15 @@ export function ImplementationOptions({
                   setStrategy(e.target.value as "files" | "worktrees")
                 }
               >
-                <NativeSelectOption value="files">
-                  Archivos distintos en una carpeta compartida
-                </NativeSelectOption>
-                <NativeSelectOption value="worktrees">
-                  Worktrees Git separados, ya creados
-                </NativeSelectOption>
+                <NativeSelectOption value="files">{t("Archivos distintos en una carpeta compartida")} </NativeSelectOption>
+                <NativeSelectOption value="worktrees">{t("Worktrees Git separados, ya creados")} </NativeSelectOption>
               </NativeSelect>
             </div>
             <Alert>
               <AlertDescription>
                 {strategy === "files"
-                  ? "El reparto es un acuerdo: detecta cambios fuera del alcance, pero no bloquea los editores ni demuestra quién escribió cada archivo."
-                  : "Los worktrees aíslan físicamente los archivos. Ambos deben existir, estar limpios y compartir repositorio y HEAD. Los agentes conservan sus permisos normales."}
+                  ? t("El reparto es un acuerdo: detecta cambios fuera del alcance, pero no bloquea los editores ni demuestra quién escribió cada archivo.")
+                  : t("Los worktrees aíslan físicamente los archivos. Ambos deben existir, estar limpios y compartir repositorio y HEAD. Los agentes conservan sus permisos normales.")}
               </AlertDescription>
             </Alert>
             <div className="grid gap-5 sm:grid-cols-2">
@@ -184,24 +174,24 @@ export function ImplementationOptions({
                 <div key={w.name} className="space-y-3">
                   <Label>{w.name}</Label>
                   <Input
-                    aria-label={`Carpeta de escritura ${w.name}`}
+                    aria-label={t('Carpeta de escritura {agent}',{agent:w.name})}
                     value={w.root}
                     disabled={strategy === "files" && w.name === "Claude"}
                     onChange={(e) => w.setRoot(e.target.value)}
-                    placeholder="Carpeta Git absoluta"
+                    placeholder={t("Carpeta Git absoluta")}
                   />
                   <Textarea
-                    aria-label={`Archivos asignados ${w.name}`}
+                    aria-label={t('Archivos asignados {agent}',{agent:w.name})}
                     rows={3}
                     value={w.paths}
                     onChange={(e) => w.setPaths(e.target.value)}
-                    placeholder="archivo.ts o src/ · uno por línea"
+                    placeholder={t("archivo.ts o src/ · uno por línea")}
                   />
                 </div>
               ))}
             </div>
             <div>
-              <Label htmlFor="required-checks">Comprobaciones requeridas</Label>
+              <Label htmlFor="required-checks">{t("Comprobaciones requeridas")}</Label>
               <Textarea
                 id="required-checks"
                 className="mt-2"
@@ -209,16 +199,9 @@ export function ImplementationOptions({
                 value={checks}
                 onChange={(e) => setChecks(e.target.value)}
               />
-              <p className="mt-2 text-xs text-muted-foreground">
-                Nombres, uno por línea. Los agentes ejecutan las pruebas y
-                registran sus resultados como declaraciones.
-              </p>
+              <p className="mt-2 text-xs text-muted-foreground">{t("Nombres, uno por línea. Los agentes ejecutan las pruebas y registran sus resultados como declaraciones.")} </p>
             </div>
-            <p className="text-xs text-muted-foreground">
-              La base se fija al preparar. La integración produce un parche
-              comprobado en un índice temporal; aplicar, hacer commit o publicar
-              son pasos separados.
-            </p>
+            <p className="text-xs text-muted-foreground">{t("La base se fija al preparar. La integración produce un parche comprobado en un índice temporal; aplicar, hacer commit o publicar son pasos separados.")} </p>
           </>
         )}
       </CardContent>
@@ -271,7 +254,7 @@ export function ImplementationDetail({
         throw new Error(
           typeof failure?.error === "string"
             ? failure.error
-            : "El servicio local no pudo preparar el parche.",
+            : t("El servicio local no pudo preparar el parche."),
         );
       }
       // Use the authenticated HTTP attachment: the Desktop browser cannot
@@ -286,7 +269,7 @@ export function ImplementationDetail({
       // A prior inspection is only an observation; a failed download must not
       // leave its ready badge or link suggesting that the patch is current.
       setInspection(null);
-      setError(`No se pudo descargar el parche. ${(e as Error).message}`);
+      setError(t('No se pudo descargar el parche. {error}',{error:(e as Error).message}));
       try {
         setInspection((await inspect()) as Inspection);
       } catch {
@@ -301,22 +284,21 @@ export function ImplementationDetail({
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between gap-3">
-            <CardTitle>Contrato de implementación</CardTitle>
+            <CardTitle>{t("Contrato de implementación")}</CardTitle>
             <Badge variant="outline">
               {state.plan.strategy === "files"
-                ? "Acuerdo de archivos"
-                : "Worktrees separados"}
+                ? t("Acuerdo de archivos")
+                : t("Worktrees separados")}
             </Badge>
           </div>
           <CardDescription>
             {state.plan.strategy === "files"
-              ? "No hay bloqueos de editor ni autoría técnica verificada."
-              : "Archivos separados; los permisos de los agentes siguen aplicándose."}
+              ? t("No hay bloqueos de editor ni autoría técnica verificada.")
+              : t("Archivos separados; los permisos de los agentes siguen aplicándose.")}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <p className="break-all text-xs text-muted-foreground">
-            Base Git: {state.plan.baseCommit}
+          <p className="break-all text-xs text-muted-foreground">{t("Base Git:")} {state.plan.baseCommit}
           </p>
           {state.plan.workspaces.map((w) => (
             <div key={w.provider} className="rounded-md border p-4">
@@ -337,17 +319,13 @@ export function ImplementationDetail({
       </Card>
       <Card>
         <CardHeader>
-          <CardTitle>Candidato y evidencia</CardTitle>
-          <CardDescription>
-            La captura congela parches, archivos y contexto en una versión.
-            Recapturar crea otra versión y exige otra revisión.
-          </CardDescription>
+          <CardTitle>{t("Candidato y evidencia")}</CardTitle>
+          <CardDescription>{t("La captura congela parches, archivos y contexto en una versión. Recapturar crea otra versión y exige otra revisión.")} </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {candidate ? (
             <>
-              <p className="text-sm">
-                Versión {candidate.version} · contexto{" "}
+              <p className="text-sm">{t("Versión")} {candidate.version} {t("· contexto")}{" "}
                 {candidate.contextVersion}
               </p>
               <p className="break-all text-xs text-muted-foreground">
@@ -357,15 +335,13 @@ export function ImplementationDetail({
                 <p key={s.provider} className="text-sm">
                   {s.provider}:{" "}
                   {s.files
-                    .map((f) => f.path + (f.hash ? "" : " (borrado)"))
-                    .join(", ") || "Sin cambios"}
+                    .map((f) => f.path + (f.hash ? "" : t(" (borrado)")))
+                    .join(", ") || t("Sin cambios")}
                 </p>
               ))}
             </>
           ) : (
-            <p className="text-sm text-muted-foreground">
-              Aún no hay candidato capturado.
-            </p>
+            <p className="text-sm text-muted-foreground">{t("Aún no hay candidato capturado.")} </p>
           )}
           <Button
             variant="outline"
@@ -374,9 +350,7 @@ export function ImplementationDetail({
               void onWork({ action: "capture", taskId: crypto.randomUUID() })
             }
           >
-            <GitBranch />
-            Capturar candidato
-          </Button>
+            <GitBranch />{t("Capturar candidato")} </Button>
           <div className="space-y-3">
             {state.plan.requiredChecks.map((check) => {
               const receipt = state.checks
@@ -392,14 +366,14 @@ export function ImplementationDetail({
                     {check} ·{" "}
                     {receipt
                       ? receipt.exitCode === 0
-                        ? "Éxito declarado"
-                        : "Fallo declarado"
-                      : "Falta recibo vigente"}
+                        ? t("Éxito declarado")
+                        : t("Fallo declarado")
+                      : t("Falta recibo vigente")}
                   </p>
                   {receipt && (
                     <>
                       <p className="mt-1 break-all text-xs">
-                        {receipt.command} · salida {receipt.exitCode}
+                        {receipt.command} {t("· salida")} {receipt.exitCode}
                       </p>
                       <p className="mt-1 text-xs text-muted-foreground">
                         {receipt.summary}
@@ -412,9 +386,7 @@ export function ImplementationDetail({
           </div>
           {candidate && enabled && (
             <details className="rounded-md border p-4">
-              <summary className="cursor-pointer text-sm">
-                Registrar una comprobación declarada
-              </summary>
+              <summary className="cursor-pointer text-sm">{t("Registrar una comprobación declarada")} </summary>
               <form
                 className="mt-4 space-y-3"
                 onSubmit={(e) => {
@@ -430,7 +402,7 @@ export function ImplementationDetail({
                 }}
               >
                 <NativeSelect
-                  aria-label="Nombre de comprobación"
+                  aria-label={t("Nombre de comprobación")}
                   className="w-full"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
@@ -442,14 +414,14 @@ export function ImplementationDetail({
                   ))}
                 </NativeSelect>
                 <Input
-                  aria-label="Comando ejecutado"
+                  aria-label={t("Comando ejecutado")}
                   required
                   value={command}
                   onChange={(e) => setCommand(e.target.value)}
-                  placeholder="Comando que ejecutaste"
+                  placeholder={t("Comando que ejecutaste")}
                 />
                 <Input
-                  aria-label="Código de salida"
+                  aria-label={t("Código de salida")}
                   type="number"
                   min={-1}
                   max={255}
@@ -458,18 +430,14 @@ export function ImplementationDetail({
                   onChange={(e) => setExitCode(Number(e.target.value))}
                 />
                 <Textarea
-                  aria-label="Resumen de comprobación"
+                  aria-label={t("Resumen de comprobación")}
                   required
                   value={summary}
                   onChange={(e) => setSummary(e.target.value)}
-                  placeholder="Resultado y límites de la evidencia"
+                  placeholder={t("Resultado y límites de la evidencia")}
                 />
-                <p className="text-xs text-muted-foreground">
-                  Registrar este recibo no ejecuta ni verifica el comando.
-                </p>
-                <Button type="submit" size="sm">
-                  Guardar recibo
-                </Button>
+                <p className="text-xs text-muted-foreground">{t("Registrar este recibo no ejecuta ni verifica el comando.")} </p>
+                <Button type="submit" size="sm">{t("Guardar recibo")} </Button>
               </form>
             </details>
           )}
@@ -477,11 +445,8 @@ export function ImplementationDetail({
       </Card>
       <Card>
         <CardHeader>
-          <CardTitle>Preparación de integración</CardTitle>
-          <CardDescription>
-            Recomprueba archivos, recibos y revisión del otro agente de la
-            versión exacta. Busca conflictos sin alterar los checkouts.
-          </CardDescription>
+          <CardTitle>{t("Preparación de integración")}</CardTitle>
+          <CardDescription>{t("Recomprueba archivos, recibos y revisión del otro agente de la versión exacta. Busca conflictos sin alterar los checkouts.")} </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <Button
@@ -489,31 +454,29 @@ export function ImplementationDetail({
             disabled={busy}
             onClick={() => void recheck()}
           >
-            <RefreshCw className={busy ? "animate-spin" : ""} />
-            Comprobar integración
-          </Button>
+            <RefreshCw className={busy ? "animate-spin" : ""} />{t("Comprobar integración")} </Button>
           {error && (
             <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
+              <AlertDescription>{t(error)}</AlertDescription>
             </Alert>
           )}
           {inspection && (
             <>
               <Badge variant={inspection.ready ? "secondary" : "outline"}>
                 {inspection.ready
-                  ? "Preparado en la última comprobación"
-                  : "Pendiente de resolver"}
+                  ? t("Preparado en la última comprobación")
+                  : t("Pendiente de resolver")}
               </Badge>
               {inspection.reasons.map((r, i) => (
                 <p key={i} className="text-sm">
-                  {r}
+                  {t(r)}
                 </p>
               ))}
               {inspection.integration && (
                 <p className="text-sm">
                   {inspection.integration.clean
-                    ? "Los parches se combinan sobre la base fijada."
-                    : "Conflicto al combinar los parches."}
+                    ? t("Los parches se combinan sobre la base fijada.")
+                    : t("Conflicto al combinar los parches.")}
                 </p>
               )}
               {inspection.ready && (
@@ -522,17 +485,11 @@ export function ImplementationDetail({
                   disabled={busy}
                   onClick={() => void download()}
                 >
-                  <Download />
-                  Descargar parche revalidado
-                </Button>
+                  <Download />{t("Descargar parche revalidado")} </Button>
               )}
             </>
           )}
-          <p className="text-xs text-muted-foreground">
-            Las pruebas y el veredicto de revisión son declaraciones atribuidas.
-            Preparar el parche no certifica consenso, no hace commit y no
-            publica. La descarga vuelve a comprobar el estado actual.
-          </p>
+          <p className="text-xs text-muted-foreground">{t("Las pruebas y el veredicto de revisión son declaraciones atribuidas. Preparar el parche no certifica consenso, no hace commit y no publica. La descarga vuelve a comprobar el estado actual.")} </p>
         </CardContent>
       </Card>
     </div>

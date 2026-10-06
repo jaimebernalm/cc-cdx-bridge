@@ -1,0 +1,16 @@
+{
+  "name": "cc-cdx-bridge",
+  "displayName": "CC–CDX Bridge",
+  "version": "0.9.0",
+  "description": "Start and control scoped collaboration between Claude Code Desktop and Codex Desktop, with verified callers, persistent context, exact reviews and a private bilingual local panel.",
+  "author": {
+    "name": "Jaime Bernal (fork of Leon Kohli)"
+  },
+  "homepage": "https://github.com/jaimebernalm/cc-cdx-bridge",
+  "license": "MIT",
+  "keywords": [
+    "codex",
+    "collaboration",
+    "desktop"
+  ]
+}

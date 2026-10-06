@@ -1,3 +1,4 @@
+import {desktopPanelRoutes,type DesktopPanelAdapter} from './desktop-panel';
 import { Database } from 'bun:sqlite';
 import { existsSync, realpathSync } from 'node:fs';
 import { join, resolve, extname } from 'node:path';
@@ -11,27 +12,28 @@ import { readDesktopInputSnapshot, deliverToDesktop } from './desktop';
 import { doctor } from './doctor';
 import {normalizeImplementation} from './implementation';
 import { version } from './version';
+import { receptionPreflight, requireReception, PreflightBlocked } from './preflight';
 import { ProjectAuthorizations, authorizationIdentitySchema, authorizationChangeSchema } from './project-authorization';
 import { processStart } from './claude';
 import { normalizeRoutine, routineGuides, routineCatalog } from './routines';
 
 const equal=(a:string,b:string)=>Buffer.byteLength(a)===Buffer.byteLength(b)&&timingSafeEqual(Buffer.from(a),Buffer.from(b));
-type Options=ParticipantOptions&{codexHome:string;pluginRoot:string;ownerThread?:string;port?:number};
+type Options=ParticipantOptions&{codexHome:string;pluginRoot:string;ownerThread?:string;ownerProvider?:'codex'|'claude';desktop?:DesktopPanelAdapter;port?:number};
 export function startPanel(options:Options){
   const store=new RunStore(options.stateDir),commands=new PanelCommands(options.stateDir),authorizations=new ProjectAuthorizations(options.stateDir);
-  const token=randomBytes(32).toString('hex'),session=randomBytes(32).toString('hex'),csrf=randomBytes(32).toString('hex');
-  let exchanged=false,closed=false;const streams=new Set<()=>void>();const wakes=new Set<Promise<unknown>>();
+  let token=randomBytes(32).toString('hex');const session=randomBytes(32).toString('hex'),csrf=randomBytes(32).toString('hex');
+  const desktop=options.desktop?desktopPanelRoutes(options,options.desktop,randomBytes(16).toString('hex')):undefined;let exchanged=false,sessionEstablished=false,closed=false;const streams=new Set<()=>void>();const wakes=new Set<Promise<unknown>>();
   const assetRoot=resolve(options.pluginRoot,'panel-dist');
   const headers={ 'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer',
     'Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; font-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'" };
   const json=(data:unknown,status=200,extra:Record<string,string>={})=>Response.json(data,{status,headers:{...headers,...extra}});
   const ownerFor=(id:string)=>{const db=new Database(join(options.stateDir,'collaborations.sqlite'),{readonly:true});
-    try{const row=db.query<{owner_thread:string},[string]>('SELECT owner_thread FROM runs WHERE id=?').get(id);if(!row||options.ownerThread&&row.owner_thread!==options.ownerThread)throw new Error('Unknown collaboration');return row.owner_thread;}finally{db.close();}};
-  const list=()=>{const db=new Database(join(options.stateDir,'collaborations.sqlite'),{readonly:true});try{
+    try{const row=db.query<{owner_thread:string},[string]>('SELECT owner_thread FROM runs WHERE id=?').get(id);if(!row||options.ownerProvider==='claude'||options.ownerThread&&row.owner_thread!==options.ownerThread)throw new Error('Unknown collaboration');return row.owner_thread;}finally{db.close();}};
+  const list=()=>{if(options.ownerProvider==='claude')return [];const db=new Database(join(options.stateDir,'collaborations.sqlite'),{readonly:true});try{
     const owners=options.ownerThread?[{owner_thread:options.ownerThread}]:db.query<{owner_thread:string},[]>('SELECT DISTINCT owner_thread FROM runs').all();
     return owners.flatMap(o=>store.list(o.owner_thread).map(r=>({...r,ownerThread:o.owner_thread}))).sort((a,b)=>b.createdAt-a.createdAt).slice(0,200);
   }finally{db.close();}};
-  const identity=async(input:PanelRequest)=>{
+  const identity=async(input:PanelRequest)=>{if(options.ownerProvider==='claude')throw new Error('Use Desktop collaboration controls from this Claude panel');
     if(options.ownerThread&&input.ownerThread!==options.ownerThread)throw new Error('Select the conversation bound to this panel');
     const sessions=await discoverParticipants(options.configDir,options.stateDir);const selected=sessions.find(s=>s.sessionId===input.ownerThread&&s.provider==='codex');
     if(!selected?.panelReceiver)throw new Error('Reload Codex with the phase-4 plugin before starting or controlling from the panel');
@@ -45,6 +47,7 @@ export function startPanel(options:Options){
       await compareProjects(codex.project,claude.project,input.command.revisionPolicy,input.command.comparisonBase);
       if(claude.status!=='idle'&&!input.command.allowBusyPeer)throw new Error('Claude is busy; wait or choose the explicit busy option');
       if(input.command.continuedFrom)store.assertOwner(input.command.continuedFrom,input.ownerThread);
+      requireReception(await receptionPreflight(options,input.ownerThread,input.command.peerId,[codex,claude]));
     }else{
       const run=store.status(input.command.runId,input.ownerThread);
       if(run.coordination?.revision!==input.command.expectedRevision)throw new Error('Control revision changed; refresh the collaboration');
@@ -93,7 +96,7 @@ export function startPanel(options:Options){
       }catch{if(!closed)commands.reconciliationIssue(pending.map(c=>c.id),'Native history unavailable; delivery remains uncertain and is not resent');}
     }));
   };
-  const inspectCommands=async()=>{
+  const inspectCommands=async()=>{if(options.ownerProvider==='claude')return [];
     await commands.inspectApplications();const rows=commands.list(options.ownerThread);
     const owners=[...new Set(rows.filter(c=>c.state==='unknown').map(c=>c.owner))];
     // Bound work per poll; rotate so unavailable chats cannot starve later ones.
@@ -111,14 +114,16 @@ export function startPanel(options:Options){
         if(url.pathname==='/api/v1/session'&&req.method==='POST'){
           if(requestOrigin!==origin)return json({error:'Session requires same origin'},403);
           const supplied=z.object({token:z.string().max(128)}).strict().parse(await body(req)).token;
-          if(!equal(supplied,token))return json({error:'Invalid access token'},401);exchanged=true;
+          if(exchanged)return json({error:'Access token already exchanged; reopen the panel'},401);
+          if(!equal(supplied,token))return json({error:'Invalid access token'},401);exchanged=true;sessionEstablished=true;
           return json({csrf,ownerThread:options.ownerThread??null},200,{'Set-Cookie':`${cookieName}=${session}; HttpOnly; SameSite=Strict; Path=/`});
         }
         if(url.pathname.startsWith('/api/')){
           const cookie=(req.headers.get('cookie')??'').split(';').map(s=>s.trim()).find(s=>s.startsWith(cookieName+'='))?.slice(cookieName.length+1)??'';
-          if(!exchanged||!equal(cookie,session))return json({error:'Open the private panel link to connect'},401);
+          if(!sessionEstablished||!equal(cookie,session))return json({error:'Open the private panel link to connect'},401);
           if(req.method!=='GET'&&(requestOrigin!==origin||!equal(req.headers.get('x-csrf-token')??'',csrf)))return json({error:'Invalid CSRF token'},403);
-          if(url.pathname==='/api/v1/health'&&req.method==='GET')return json({version,csrf,ownerThread:options.ownerThread??null});
+          if(url.pathname==='/api/v1/health'&&req.method==='GET')return json({version,csrf,ownerThread:options.ownerThread??null,ownerProvider:options.ownerProvider??'codex',desktop:!!desktop});
+          if(url.pathname.startsWith('/api/v1/desktop/')&&desktop)return json(await desktop.handle(url.pathname.slice('/api/v1/desktop/'.length),req.method,()=>body(req)));
           if(url.pathname==='/api/v1/participants'&&req.method==='GET')return json(await discoverParticipants(options.configDir,options.stateDir));
           if(url.pathname==='/api/v1/project-authorization'&&req.method==='GET'){
             const id=await authorizationIdentity({ownerThread:url.searchParams.get('ownerThread'),project:url.searchParams.get('project')});
@@ -133,7 +138,7 @@ export function startPanel(options:Options){
           if(url.pathname==='/api/v1/presets'&&req.method==='GET')return json(routineCatalog.map(p=>({...p,guidance:routineGuides[p.id]})));
           if(url.pathname==='/api/v1/runs'&&req.method==='GET')return json(list());
           if(url.pathname==='/api/v1/commands'&&req.method==='GET')return json(await inspectCommands());
-          if(url.pathname==='/api/v1/preflight'&&req.method==='POST'){const input=panelRequestSchema.parse(await body(req));await identity(input);return json({ready:true});}
+          if(url.pathname==='/api/v1/preflight'&&req.method==='POST'){const input=panelRequestSchema.parse(await body(req));await identity(input);return json({ready:true,roundTripVerified:false,message:'Requisitos comprobados. El agente debe verificar una respuesta correlacionada antes de analizar.'});}
           if(url.pathname==='/api/v1/commands'&&req.method==='POST'){
             const input=panelRequestSchema.parse(await body(req));
             if(options.ownerThread&&input.ownerThread!==options.ownerThread)throw new Error('Wrong conversation for this panel');
@@ -159,7 +164,7 @@ export function startPanel(options:Options){
               return new Response(inspection.integration.patch,{headers:{...headers,'Content-Type':'text/x-diff; charset=utf-8','Content-Disposition':`attachment; filename="implementation-${id}.patch"`}});
             }
             if(match[2]==='export'){const format=z.enum(['markdown','json']).parse(url.searchParams.get('format')??'markdown');return new Response(store.export(id,owner,format),{headers:{...headers,'Content-Type':format==='json'?'application/json':'text/markdown; charset=utf-8','Content-Disposition':`attachment; filename="collaboration-${id}.${format==='json'?'json':'md'}"`}});}
-            const after=z.coerce.number().int().min(0).parse(url.searchParams.get('after')??req.headers.get('last-event-id')??0);
+            const after=z.coerce.number().int().min(0).parse(req.headers.get('last-event-id')??url.searchParams.get('after')??0);
             if(match[2]==='events')return json({events:run.events.filter(e=>e.sequence>after).slice(0,100),cursor:run.events.filter(e=>e.sequence>after).slice(0,100).at(-1)?.sequence??after});
             let stop=()=>{};const stream=new ReadableStream<Uint8Array>({start(controller){let cursor=after;
               const send=()=>{try{const current=store.status(id,owner);for(const e of current.events.filter(e=>e.sequence>cursor)){controller.enqueue(new TextEncoder().encode(`id: ${e.sequence}\nevent: update\ndata: ${JSON.stringify(e)}\n\n`));cursor=e.sequence;}controller.enqueue(new TextEncoder().encode(': heartbeat\n\n'));}catch{stop();try{controller.close();}catch{}}};
@@ -173,9 +178,9 @@ export function startPanel(options:Options){
         if(relative!=='index.html'&&!/^assets\/[\w.-]+\.(js|css|woff2)$/.test(relative))return json({error:'Unknown asset'},404);
         const file=join(assetRoot,relative);if(!existsSync(file))return json({error:'Panel assets missing; build the UI'},503);
         return new Response(Bun.file(file),{headers:{...headers,'Cache-Control':extname(file)==='.html'?'no-store':'public, max-age=31536000, immutable'}});
-      }catch(error){return json({error:error instanceof Error?error.message:'Panel request failed'},409);}
+      }catch(error){return json({error:error instanceof Error?error.message:'Panel request failed',...(error instanceof PreflightBlocked?{preflight:error.preflight}:{})},409);}
     }});
-  return {url:`http://127.0.0.1:${server.port}/#token=${token}`,origin:`http://127.0.0.1:${server.port}`,store,commands,
+  return {get url(){return `http://127.0.0.1:${server.port}/#token=${token}`;},reopenUrl(){if(closed)throw new Error('Panel closed');token=randomBytes(32).toString('hex');exchanged=false;return `http://127.0.0.1:${server.port}/#token=${token}`;},origin:`http://127.0.0.1:${server.port}`,store,commands,
     async reconcileCommand(id:string){const command=commands.get(id);if(command)await reconcile([command]);},
-    async close(){if(closed)return;closed=true;for(const stop of streams)stop();await server.stop(true);await Promise.allSettled([...wakes]);store.close();commands.close();authorizations.close();}};
+    async close(){if(closed)return;closed=true;for(const stop of streams)stop();await server.stop(true);await Promise.allSettled([...wakes]);desktop?.close();store.close();commands.close();authorizations.close();}};
 }
