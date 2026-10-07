@@ -90,6 +90,16 @@ export function sameSnapshot(first: Participant, second: Participant) {
     && JSON.stringify(first.project) === JSON.stringify(second.project);
 }
 
+// Human-readable reason for a pinned-snapshot mismatch, so the panel can say what changed and what to do.
+export function snapshotChange(a:Participant,b:Participant){
+ const who=a.provider==='codex'?'Codex':'Claude';
+ if(a.pid!==b.pid||a.procStart!==b.procStart||a.socketPath!==b.socketPath||a.surface!==b.surface||a.version!==b.version)return `The ${who} chat was restarted or reloaded since this collaboration was prepared`;
+ if(a.project.directory!==b.project.directory||a.project.worktree!==b.project.worktree||a.project.commonGitDir!==b.project.commonGitDir)return `The ${who} chat now uses a different folder`;
+ if(a.project.branch!==b.project.branch)return `The branch changed (${a.project.branch??'none'} → ${b.project.branch??'none'}) since this collaboration was prepared`;
+ if(a.project.head!==b.project.head)return 'A new commit was made since this collaboration was prepared';
+ return 'Project files changed (uncommitted edits) since this collaboration was prepared';
+}
+
 // A write contract relaxes dirty fingerprints only for its registered workspaces.
 export function sameScopedSnapshot(a:Participant,b:Participant,plan:import('./implementation').ImplementationPlan|null){
  if(!plan?.workspaces.some(w=>w.root===a.project.worktree))return sameSnapshot(a,b);

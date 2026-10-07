@@ -80,6 +80,8 @@ test('checks are attributed declarations for the exact current candidate', async
   expect(() => ledger.check(runId, op, codex, passing(candidate.contentHash))).toThrow('different content');
 });
 
+// Several fresh captures and Git previews spawn real processes; hosted macOS
+// runners need more than Bun's default 5 s for this whole scenario.
 test('readiness needs a fresh exact candidate, passing checks, the other participant agreeing and a clean preview', async () => {
   writeFileSync(join(repo, 'codex.txt'), 'codex change\n');
   const { candidate } = await ledger.capture(runId, codex, randomUUID(), 1);
@@ -97,7 +99,7 @@ test('readiness needs a fresh exact candidate, passing checks, the other partici
   expect((await inspect([review(claude, { contextVersion: 2 })], 2)).reasons).toContain('Context changed after capture');
   writeFileSync(join(repo, 'codex.txt'), 'edited after capture\n');
   expect((await inspect([review(claude)])).reasons).toContain('Workspace or context changed after capture');
-});
+}, 20000);
 
 test('a failed declared check or evidence that changes during inspection is never ready', async () => {
   writeFileSync(join(repo, 'claude.txt'), 'claude change\n');
