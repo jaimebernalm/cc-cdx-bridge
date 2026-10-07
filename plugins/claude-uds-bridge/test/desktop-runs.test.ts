@@ -51,3 +51,13 @@ test('an unstarted draft can be cancelled by its initiator without acquiring cla
 });
 
 test('the bound participant panel can start, while peer MCP and an unrelated panel cannot',()=>{const f=fixture();try{f.store.control(f.id,f.own,randomUUID(),1,{action:'cancel'},f.holder);const id=f.store.prepare(f.own,randomUUID(),{objective:'Scoped participant panel'},{maxMessages:4,maxSeconds:60},f.participants);expect(()=>f.store.start(id,f.peer,f.holder)).toThrow('initiating');expect(()=>f.store.start(id,{provider:'codex',sessionId:randomUUID()},f.holder,'panel_session:fixture')).toThrow('participant');expect(()=>f.store.start(id,f.peer,f.holder,'not-a-panel')).toThrow('scoped panel');f.store.start(id,f.peer,f.holder,'panel_session:fixture');expect(f.store.status(id,f.own).state).toBe('active');expect(f.store.status(id,f.own).events.find(e=>e.type==='started')!.actor).toBe('panel_session:fixture');}finally{f.close();}});
+test('folder revisions are re-pinned without voiding consent, while identity changes are refused',()=>{const f=fixture();try{
+ expect(f.store.consent(f.id,f.own,'panel_session:nonsecret',1).valid).toBe(true);
+ const moved=f.participants.map(p=>({...p,project:{...p.project,head:'b'.repeat(40),diffHash:'edited',statusHash:'edited'}}));
+ expect(f.store.repin(f.id,f.participants,null)).toEqual([]);
+ const moves=f.store.repin(f.id,moved,null);expect(moves).toHaveLength(2);expect(moves[0]).toMatchObject({from:{head:null},to:{head:'b'.repeat(40)},filesChanged:true});
+ const state=f.store.status(f.id,f.own);expect(state.participants.every(p=>p.project.head==='b'.repeat(40))).toBe(true);expect(state.consent.valid).toBe(true);expect(state.coordination.revision).toBe(1);
+ expect(state.events.filter(e=>e.type==='project_revision_moved')).toHaveLength(1);expect(f.store.repin(f.id,moved,null)).toEqual([]);
+ const plan={workspaces:[{root:f.root}]} as unknown as import('../src/implementation').ImplementationPlan;expect(f.store.repin(f.id,f.participants,plan)).toEqual([]);
+ expect(()=>f.store.repin(f.id,moved.map(p=>({...p,pid:p.pid+10})),null)).toThrow('identity');expect(f.store.status(f.id,f.own).participants[0]!.pid).toBe(f.participants[0]!.pid);
+}finally{f.close()}});

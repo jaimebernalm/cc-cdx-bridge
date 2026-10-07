@@ -11,7 +11,7 @@ import { RunStore } from './runs';
 import { DesktopRunStore, parseDesktopMessage } from './desktop-runs';
 import { ProjectAuthorizations } from './project-authorization';
 import {captureImplementation} from './implementation';
-import { inspectParticipant, matchesProcess, sameScopedSnapshot } from './participants';
+import { inspectParticipant, matchesProcess, sameDesktopParticipant, sameScopedSnapshot } from './participants';
 import { version } from './version';
 
 type Message = { id: string; peer_id: string; direction: string; text: string; status: string; turn_id: string | null;
@@ -665,7 +665,7 @@ export class Bridge {
     if (claim === 'full') { await this.receipt(message, 'dropped', 'queue-full'); return; }
 
     try {
-      const neutral=this.desktopRuns.incomingParticipants(message.id);if(neutral){try{const fresh=await Promise.all(neutral.participants.map(p=>inspectParticipant({configDir:this.configDir,stateDir:this.stateDir,ipcPath:this.ipcPath},p.sessionId,p.provider)));const plan=this.desktopRuns.implementationPlan(neutral.runId);if(neutral.participants.some((p,i)=>!sameScopedSnapshot(p,fresh[i]!,plan)))throw new Error('Participant changed');if(plan)await captureImplementation(plan,this.desktopRuns.status(neutral.runId,{provider:'codex',sessionId:this.threadId}).contextVersion);}catch{this.db.run("UPDATE messages SET status='dropped',drop_reason='participant-or-project-changed',awaiting_input=0 WHERE id=?",[message.id]);await this.receipt(message,'dropped','participant-or-project-changed');return;}}const managed=this.runs.incomingParticipants(message.id);
+      const neutral=this.desktopRuns.incomingParticipants(message.id);if(neutral){try{const fresh=await Promise.all(neutral.participants.map(p=>inspectParticipant({configDir:this.configDir,stateDir:this.stateDir,ipcPath:this.ipcPath},p.sessionId,p.provider)));const plan=this.desktopRuns.implementationPlan(neutral.runId);if(neutral.participants.some((p,i)=>!sameDesktopParticipant(p,fresh[i]!,plan)))throw new Error('Participant changed');if(plan)await captureImplementation(plan,this.desktopRuns.status(neutral.runId,{provider:'codex',sessionId:this.threadId}).contextVersion);}catch{this.db.run("UPDATE messages SET status='dropped',drop_reason='participant-or-project-changed',awaiting_input=0 WHERE id=?",[message.id]);await this.receipt(message,'dropped','participant-or-project-changed');return;}}const managed=this.runs.incomingParticipants(message.id);
       if (managed) {
         try {
           const fresh=await Promise.all(managed.participants.map(peer=>inspectParticipant({configDir:this.configDir,stateDir:this.stateDir,ipcPath:this.ipcPath},peer.sessionId,peer.provider)));

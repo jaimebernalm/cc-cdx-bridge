@@ -100,8 +100,30 @@ export function snapshotChange(a:Participant,b:Participant){
  return 'Project files changed (uncommitted edits) since this collaboration was prepared';
 }
 
+// The exact chat process and the repository it has open; never re-pinned.
+export function sameIdentity(a:Participant,b:Participant){
+ return a.sessionId===b.sessionId&&a.provider===b.provider&&a.pid===b.pid&&a.procStart===b.procStart&&a.socketPath===b.socketPath&&a.surface===b.surface&&a.version===b.version
+  &&a.project.kind===b.project.kind&&a.project.directory===b.project.directory&&a.project.worktree===b.project.worktree&&a.project.commonGitDir===b.project.commonGitDir;
+}
+
+export type RevisionMove={provider:'codex'|'claude';directory:string;from:{branch:string|null;head:string|null};to:{branch:string|null;head:string|null};filesChanged:boolean};
+// Commits, branch switches or edits in the folder a chat has open, whoever made them.
+export function revisionMove(a:Participant,b:Participant):RevisionMove|null{
+ const x=a.project,y=b.project;
+ if(x.branch===y.branch&&x.head===y.head&&x.diffHash===y.diffHash&&x.statusHash===y.statusHash)return null;
+ return {provider:a.provider,directory:x.directory,from:{branch:x.branch,head:x.head},to:{branch:y.branch,head:y.head},filesChanged:x.diffHash!==y.diffHash||x.statusHash!==y.statusHash};
+}
+
+export function revisionFrozen(a:Participant,plan:import('./implementation').ImplementationPlan|null){return !!plan?.workspaces.some(w=>w.root===a.project.worktree);}
+
 // A write contract relaxes dirty fingerprints only for its registered workspaces.
 export function sameScopedSnapshot(a:Participant,b:Participant,plan:import('./implementation').ImplementationPlan|null){
- if(!plan?.workspaces.some(w=>w.root===a.project.worktree))return sameSnapshot(a,b);
- return a.sessionId===b.sessionId&&a.provider===b.provider&&a.pid===b.pid&&a.procStart===b.procStart&&a.socketPath===b.socketPath&&a.surface===b.surface&&a.version===b.version&&a.project.directory===b.project.directory&&a.project.worktree===b.project.worktree&&a.project.commonGitDir===b.project.commonGitDir&&a.project.head===b.project.head;
+ if(!revisionFrozen(a,plan))return sameSnapshot(a,b);
+ return sameIdentity(a,b)&&a.project.head===b.project.head;
+}
+
+// Desktop runs pin identity, not revision: the shared folder may be changed by chats outside the run,
+// so its revision is re-pinned and announced (see revisionMove). A write contract still freezes its workspace HEAD.
+export function sameDesktopParticipant(a:Participant,b:Participant,plan:import('./implementation').ImplementationPlan|null){
+ return revisionFrozen(a,plan)?sameScopedSnapshot(a,b,plan):sameIdentity(a,b);
 }
