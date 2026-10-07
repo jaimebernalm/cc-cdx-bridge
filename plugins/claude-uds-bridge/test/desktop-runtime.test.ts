@@ -73,6 +73,25 @@ test('scoped implementation through both MCP hosts preserves dirty scope, exact 
  }finally{await client.close();await server.close();await runtime.close();await codex.close();await f.close()}
 },20000);
 
+test('a commit or edit by another chat in the shared folder is announced with the next message instead of cancelling the run',async()=>{
+ const {writeFileSync}=await import('node:fs'),{git}=await import('../src/project');const f=await nativeFixture();
+ for(const args of [['init','-q'],['config','user.email','fixture@example.invalid'],['config','user.name','Fixture']])expect((await git(f.root,args)).code).toBe(0);
+ writeFileSync(resolve(f.root,'.gitignore'),'*\n!.gitignore\n!ui.txt\n');writeFileSync(resolve(f.root,'ui.txt'),'base\n');expect((await git(f.root,['add','.'])).code).toBe(0);expect((await git(f.root,['commit','-qm','base'])).code).toBe(0);
+ const base=(await git(f.root,['rev-parse','HEAD'])).output.trim();
+ const codex=await f.connect(),server=new McpServer({name:'claude-fixture',version:'1'}),client=new Client({name:'fixture',version:'1'}),p=await inspectParticipant({configDir:f.config,stateDir:f.state,ipcPath:f.desktop.path},f.peerId,'claude');
+ const runtime=registerDesktopTools(server,{configDir:f.config,stateDir:f.state,ipcPath:f.desktop.path,codexHome:f.root,pluginRoot:root,authenticate:async()=>({provider:'claude',sessionId:p.sessionId,pid:p.pid,procStart:p.procStart,project:f.root,binding:{method:'fixture',generation:'fixture',surface:'claude-desktop',evidence:[]}})}),[a,b]=InMemoryTransport.createLinkedPair();await Promise.all([server.connect(a),client.connect(b)]);
+ const call=async(name:string,args:Record<string,unknown>)=>{const r=await client.callTool({name:'desktop_collaboration_'+name,arguments:args});if(r.isError)throw new Error(JSON.stringify(r.content));return JSON.parse((r.content as {text:string}[])[0]!.text)};
+ try{await call('discover',{});const run=await call('prepare',{requestId:randomUUID(),peerId:f.desktop.threadId,context:{objective:'shared folder keeps moving'},openPanel:false});await call('start',{runId:run.id,supervised:true});
+  await call('send',{runId:run.id,messageId:randomUUID(),text:'FIRST'});await until(()=>f.desktop.submissions.length===1);expect(JSON.stringify(f.desktop.submissions[0])).not.toContain('Project changed outside');
+  writeFileSync(resolve(f.root,'ui.txt'),'UI chat commit\n');expect((await git(f.root,['commit','-qam','ui work'])).code).toBe(0);writeFileSync(resolve(f.root,'ui.txt'),'UI chat unsaved edit\n');
+  const head=(await git(f.root,['rev-parse','HEAD'])).output.trim();
+  await call('send',{runId:run.id,messageId:randomUUID(),text:'SECOND'});await until(()=>f.desktop.submissions.length===2);
+  const second=JSON.stringify(f.desktop.submissions[1]);expect(second).toContain('SECOND');expect(second).toContain('Project changed outside this collaboration');expect(second).toContain(`moved from commit ${base.slice(0,12)} to ${head.slice(0,12)}`);expect(second).toContain('different uncommitted changes');
+  await call('send',{runId:run.id,messageId:randomUUID(),text:'THIRD'});await until(()=>f.desktop.submissions.length===3);expect(JSON.stringify(f.desktop.submissions[2])).not.toContain('Project changed outside');
+  const state=await call('status',{runId:run.id});expect(state.state).toBe('active');expect(state.participants.every((x:{project:{head:string}})=>x.project.head===head)).toBe(true);expect(state.events.filter((e:{type:string})=>e.type==='project_revision_moved')).toHaveLength(1);
+ }finally{await client.close();await server.close();await runtime.close();await codex.close();await f.close()}
+},20000);
+
 test('ticket_status works on a fresh state before any creation tool has run',async()=>{
  const f=await nativeFixture(),server=new McpServer({name:'claude-fixture',version:'1'}),client=new Client({name:'fixture',version:'1'});
  const p=await inspectParticipant({configDir:f.config,stateDir:f.state,ipcPath:f.desktop.path},f.peerId,'claude');
